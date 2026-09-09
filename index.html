@@ -429,6 +429,31 @@ section.panel h2{
 }
 .layer-row.loading .layer-spinner{display:inline-block}
 @keyframes layer-spin{to{transform:rotate(360deg)}}
+
+/* ---------- atualizar dados ---------- */
+.update-card{max-width:460px;position:relative;max-height:88vh;overflow-y:auto}
+.update-close{
+  position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.5rem;line-height:1;
+  color:var(--ink-faint);cursor:pointer;padding:2px 8px;font-family:inherit;
+}
+.update-close:hover{color:var(--ink)}
+.update-card input[type=file]{
+  width:100%;padding:8px 10px;border-radius:8px;border:1.5px dashed var(--border);
+  background:var(--surface-2);color:var(--ink-muted);font-family:inherit;font-size:.76rem;
+}
+.update-card input[type=date]{
+  width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);
+  background:var(--surface-2);color:var(--ink);font-family:inherit;font-size:.85rem;
+}
+.update-file-status{font-size:.7rem;color:var(--ink-muted);margin-top:5px}
+.update-file-status.ok{color:var(--status-done)}
+.update-file-status.err{color:var(--status-pending)}
+.update-preview{margin-top:16px;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;font-size:.76rem;color:var(--ink-muted);line-height:1.7}
+.update-preview b{color:var(--ink)}
+.update-log{margin-top:14px;font-size:.7rem;color:var(--ink-muted);font-family:"IBM Plex Mono",monospace;white-space:pre-wrap;max-height:160px;overflow-y:auto}
+.update-log .err{color:var(--status-pending)}
+.update-log .ok{color:var(--status-done)}
+#update-submit:disabled{opacity:.5;cursor:default}
 </style>
 
 <div class="login-overlay hidden" id="login-overlay">
@@ -445,11 +470,34 @@ section.panel h2{
     </form>
   </div>
 </div>
+<div class="login-overlay hidden" id="update-overlay">
+  <div class="login-card update-card">
+    <button class="update-close" id="update-close" type="button" title="Fechar">&times;</button>
+    <h1>Atualizar dados de avanço</h1>
+    <p>Envie os dois arquivos gerados a partir do KMZ/planilha mais recente. A gravação usa seu login — sem senha ou chave técnica.</p>
+
+    <label for="file-pv">Estacas, mesas, módulos — pv_compact.json</label>
+    <input type="file" id="file-pv" accept=".json,application/json">
+    <div class="update-file-status" id="status-pv">Nenhum arquivo selecionado.</div>
+
+    <label for="file-area">Supressão e terraplenagem — area_compact.json</label>
+    <input type="file" id="file-area" accept=".json,application/json">
+    <div class="update-file-status" id="status-area">Nenhum arquivo selecionado.</div>
+
+    <label for="update-date">Data desta atualização</label>
+    <input type="date" id="update-date">
+
+    <div class="update-preview" id="update-preview" hidden></div>
+
+    <button id="update-submit" type="button" disabled>Confirmar e enviar</button>
+    <div class="update-log" id="update-log"></div>
+  </div>
+</div>
 <div class="app">
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark-wrap">
-        <img class="brand-mark" src="data:image/png;base64,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" alt="Dois A Engenharia e Tecnologia">
+        <img class="brand-mark" src="data:image/png;base64,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" alt="Dois A Engenharia e Tecnologia">
       </div>
       <div class="brand-text">
         <h1>Mapa Iluminado — UFV Noronha Verde</h1>
@@ -458,7 +506,8 @@ section.panel h2{
     <div class="updated-badge" id="updated-badge">
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
       <span>Atualizado em <b id="updated-at">–</b></span>
-    
+
+      <button class="logout-link" id="update-open-btn" type="button">atualizar dados</button>
       <button class="logout-link" id="logout-btn" type="button">sair</button>
     </div>
   </header>
@@ -634,6 +683,235 @@ if(logoutBtn){
     sb.auth.signOut().then(function(){ window.location.reload(); });
   });
 }
+
+/* ============================================================
+   ATUALIZAR DADOS — upload de pv_compact.json + area_compact.json,
+   gravando pelo login do usuário (RLS authenticated), sem
+   service_role key. Escopo: estacas, mesas, módulos, supressão e
+   terraplenagem — as camadas de avanço que mudam rotineiramente.
+   Base cartográfica e aterramento ficam de fora (quase estáticas).
+   ============================================================ */
+(function(){
+  var openBtn = document.getElementById('update-open-btn');
+  var overlay = document.getElementById('update-overlay');
+  var closeBtn = document.getElementById('update-close');
+  var filePv = document.getElementById('file-pv');
+  var fileArea = document.getElementById('file-area');
+  var statusPv = document.getElementById('status-pv');
+  var statusArea = document.getElementById('status-area');
+  var dateInput = document.getElementById('update-date');
+  var preview = document.getElementById('update-preview');
+  var submitBtn = document.getElementById('update-submit');
+  var logEl = document.getElementById('update-log');
+  if(!openBtn) return;
+
+  var pvData = null, areaData = null;
+  var NVs = ['01','02','03','04','05','06'];
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function todayISO(){ var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+  function todayBR(){ var d = new Date(); return pad2(d.getDate()) + '/' + pad2(d.getMonth()+1) + '/' + d.getFullYear(); }
+
+  function resetPanel(){
+    pvData = null; areaData = null;
+    filePv.value = ''; fileArea.value = '';
+    statusPv.textContent = 'Nenhum arquivo selecionado.'; statusPv.className = 'update-file-status';
+    statusArea.textContent = 'Nenhum arquivo selecionado.'; statusArea.className = 'update-file-status';
+    preview.hidden = true; preview.innerHTML = '';
+    logEl.textContent = '';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Confirmar e enviar';
+    dateInput.value = todayISO();
+  }
+
+  openBtn.addEventListener('click', function(){ resetPanel(); overlay.classList.remove('hidden'); });
+  closeBtn.addEventListener('click', function(){ overlay.classList.add('hidden'); });
+
+  function readJsonFile(input, statusEl, expectedKeys, assign){
+    var file = input.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var data = JSON.parse(reader.result);
+        for(var i=0;i<expectedKeys.length;i++){
+          if(!(expectedKeys[i] in data)) throw new Error('faltando "' + expectedKeys[i] + '"');
+        }
+        statusEl.textContent = '✓ ' + file.name + ' — ok.';
+        statusEl.className = 'update-file-status ok';
+        assign(data);
+      }catch(err){
+        statusEl.textContent = '✗ ' + file.name + ' — arquivo inválido (' + err.message + ').';
+        statusEl.className = 'update-file-status err';
+        assign(null);
+      }
+      updatePreview();
+    };
+    reader.onerror = function(){
+      statusEl.textContent = '✗ falha ao ler o arquivo.';
+      statusEl.className = 'update-file-status err';
+      assign(null);
+      updatePreview();
+    };
+    reader.readAsText(file);
+  }
+
+  filePv.addEventListener('change', function(){
+    readJsonFile(filePv, statusPv, ['estacas','mesas','modulos'], function(d){ pvData = d; });
+  });
+  fileArea.addEventListener('change', function(){
+    readJsonFile(fileArea, statusArea, ['supressao_features','terra_features'], function(d){ areaData = d; });
+  });
+
+  function updatePreview(){
+    if(!pvData && !areaData){ preview.hidden = true; submitBtn.disabled = true; return; }
+    var lines = [];
+    if(pvData){
+      var totE=0, totM=0, totMo=0;
+      NVs.forEach(function(nv){
+        totE += ((pvData.estacas[nv]||{}).features||[]).length;
+        totM += ((pvData.mesas[nv]||{}).features||[]).length;
+        totMo += ((pvData.modulos[nv]||{}).features||[]).length;
+      });
+      lines.push('<b>Estacas:</b> ' + totE.toLocaleString('pt-BR') + ' registros');
+      lines.push('<b>Mesas:</b> ' + totM.toLocaleString('pt-BR') + ' registros');
+      lines.push('<b>Módulos:</b> ' + totMo.toLocaleString('pt-BR') + ' registros');
+    }
+    if(areaData){
+      lines.push('<b>Supressão vegetal:</b> ' + areaData.supressao_features.length.toLocaleString('pt-BR') + ' polígonos');
+      lines.push('<b>Terraplenagem:</b> ' + areaData.terra_features.length.toLocaleString('pt-BR') + ' polígonos');
+    }
+    preview.innerHTML = lines.join('<br>');
+    preview.hidden = false;
+    submitBtn.disabled = !(pvData && areaData);
+  }
+
+  function log(msg, cls){
+    var line = document.createElement('div');
+    if(cls) line.className = cls;
+    line.textContent = msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /* ---------- portado 1:1 de migracao_supabase/migrate_to_supabase.py ---------- */
+  function closeRing(ring){
+    var first = ring[0], last = ring[ring.length-1];
+    if(first[0] !== last[0] || first[1] !== last[1]) ring = ring.concat([first]);
+    return ring;
+  }
+  function wktPoint(lon, lat){ return 'SRID=4326;POINT(' + lon + ' ' + lat + ')'; }
+  function wktPolygon(ring){
+    ring = closeRing(ring);
+    return 'SRID=4326;POLYGON((' + ring.map(function(c){ return c[0] + ' ' + c[1]; }).join(', ') + '))';
+  }
+  function titleCase(s){
+    return s.replace(/\S+/g, function(w){ return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); });
+  }
+  function normalizeSetor(raw){
+    var s = raw.toUpperCase().trim().replace(/\s+/g, ' ');
+    if(s.indexOf('RMT') !== -1 && (s.indexOf('01') !== -1 || s.indexOf('FASE 1') !== -1 || s.indexOf('FASE 01') !== -1)) return ['RMT1','RMT Fase 01'];
+    if(s.indexOf('RMT') !== -1 && s.indexOf('02') !== -1) return ['RMT2','RMT Fase 02'];
+    if(s.indexOf('CANTEIRO') !== -1) return ['CANTEIRO','Canteiro UFV'];
+    if(s.indexOf('ACESSO') !== -1 && (s.indexOf('FERNANDO') !== -1 || s.indexOf(' FN') !== -1 || s.slice(-2) === 'FN')) return ['ACESSO_SE_FN','Acesso SE Fernando de Noronha'];
+    if(s.indexOf('ACESSO') !== -1 && (s.indexOf('NV 01') !== -1 || s.indexOf('NV1') !== -1 || s.indexOf('NV01') !== -1)) return ['ACESSO_NV01','Acesso NV 01'];
+    if(s.indexOf('BESS') !== -1 && (s.indexOf('SE NV') !== -1 || s.indexOf('SE NORONHA') !== -1)) return ['BESS_SE_NV','BESS + SE Noronha Verde'];
+    if(s === 'BESS' || s.indexOf('AVANÇO BESS') === 0 || s.indexOf('AVANCO BESS') === 0) return ['BESS','BESS'];
+    if(s.indexOf('SE NV') !== -1 || (s.indexOf('SE NORONHA VERDE') !== -1 && s.indexOf('FERNANDO') === -1)) return ['SE_NV','SE Noronha Verde'];
+    if(s.indexOf('FERNANDO') !== -1 && s.indexOf('ACESSO') === -1) return ['SE_FN','SE Fernando de Noronha'];
+    if((s.indexOf('NV 04') !== -1 && s.indexOf('NV 05') !== -1) || (s.indexOf('NV04') !== -1 && s.indexOf('NV05') !== -1) || (s.indexOf('04') !== -1 && s.indexOf('05') !== -1)) return ['NV0405','UFV NV 04 e 05'];
+    if(s.indexOf('NV 01') !== -1 || s.indexOf('NV01') !== -1 || s.indexOf('NV1') !== -1) return ['NV01','UFV NV 01'];
+    if(s.indexOf('NV 02') !== -1 || s.indexOf('NV02') !== -1) return ['NV02','UFV NV 02'];
+    if(s.indexOf('NV 03') !== -1 || s.indexOf('NV03') !== -1) return ['NV03','UFV NV 03'];
+    if(s.indexOf('NV 06') !== -1 || s.indexOf('NV06') !== -1) return ['NV06','UFV NV 06'];
+    return ['OUTROS', titleCase(raw)];
+  }
+
+  async function replaceTable(table, rows){
+    var del = await sb.from(table).delete().neq('id', -1);
+    if(del.error) throw new Error(table + ' (limpar tabela): ' + del.error.message);
+    if(rows.length === 0) return;
+    var BATCH = 500;
+    for(var i=0; i<rows.length; i+=BATCH){
+      var chunk = rows.slice(i, i+BATCH);
+      var ins = await sb.from(table).insert(chunk);
+      if(ins.error) throw new Error(table + ' (lote ' + (Math.floor(i/BATCH)+1) + '): ' + ins.error.message);
+      log('  ' + table + ': ' + Math.min(i+BATCH, rows.length) + '/' + rows.length);
+    }
+  }
+
+  submitBtn.addEventListener('click', function(){
+    if(!pvData || !areaData) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enviando…';
+    logEl.textContent = '';
+    log('Iniciando…');
+
+    (async function(){
+      try{
+        var estacasRows = [];
+        NVs.forEach(function(nv){
+          (pvData.estacas[nv].features||[]).forEach(function(f){
+            estacasRows.push({nv: nv, status: f[2], geom: wktPoint(f[0], f[1])});
+          });
+        });
+        log('Estacas: ' + estacasRows.length + ' registros');
+        await replaceTable('nv_estacas', estacasRows);
+
+        var mesasRows = [];
+        NVs.forEach(function(nv){
+          (pvData.mesas[nv].features||[]).forEach(function(f){
+            mesasRows.push({nv: nv, status: f[0], geom: wktPolygon(f[1])});
+          });
+        });
+        log('Mesas: ' + mesasRows.length + ' registros');
+        await replaceTable('nv_mesas', mesasRows);
+
+        var modulosRows = [];
+        NVs.forEach(function(nv){
+          (pvData.modulos[nv].features||[]).forEach(function(f){
+            modulosRows.push({nv: nv, status: f[0], geom: wktPolygon(f[1])});
+          });
+        });
+        log('Módulos: ' + modulosRows.length + ' registros (maior lote, pode levar um pouco)');
+        await replaceTable('nv_modulos', modulosRows);
+
+        var supRows = areaData.supressao_features.map(function(f){
+          var sn = normalizeSetor(f[1]);
+          return {setor_key: sn[0], setor_label: sn[1], categoria: f[0], geom: wktPolygon(f[3])};
+        });
+        log('Supressão vegetal: ' + supRows.length + ' polígonos');
+        await replaceTable('supressao', supRows);
+
+        var terraRows = areaData.terra_features.map(function(f){
+          var sn = normalizeSetor(f[1]);
+          return {setor_key: sn[0], setor_label: sn[1], categoria: f[0], geom: wktPolygon(f[3])};
+        });
+        log('Terraplenagem: ' + terraRows.length + ' polígonos');
+        await replaceTable('terraplenagem', terraRows);
+
+        var dataBR = (function(){
+          var v = dateInput.value;
+          if(!v) return todayBR();
+          var parts = v.split('-');
+          return parts[2] + '/' + parts[1] + '/' + parts[0];
+        })();
+        var metaRes = await sb.from('project_meta').update({value: dataBR}).eq('key', 'updated_at');
+        if(metaRes.error) throw new Error('data de atualização: ' + metaRes.error.message);
+        log('Data de atualização definida para ' + dataBR + '.', 'ok');
+
+        log('Concluído. Recarregando o mapa…', 'ok');
+        setTimeout(function(){ window.location.reload(); }, 1200);
+      }catch(err){
+        console.error(err);
+        log('ERRO: ' + err.message, 'err');
+        log('A tabela que falhou pode ter ficado parcialmente vazia — refaça o envio assim que possível.', 'err');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Tentar novamente';
+      }
+    })();
+  });
+})();
 
 sb.auth.onAuthStateChange(function(_event, session){
   if(session && !appBooted){
