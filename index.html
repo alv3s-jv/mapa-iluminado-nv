@@ -454,6 +454,16 @@ section.panel h2{
 .update-log .err{color:var(--status-pending)}
 .update-log .ok{color:var(--status-done)}
 #update-submit:disabled{opacity:.5;cursor:default}
+.manifest-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.71rem}
+.manifest-table th{text-align:left;color:var(--ink-faint);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--border)}
+.manifest-table td{padding:4px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+.manifest-table tr.missing td{color:var(--ink-faint);font-style:italic}
+.manifest-table td.fname{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-muted)}
+.manifest-table .ok{color:var(--status-done);font-weight:600;white-space:nowrap}
+.manifest-pick{font-family:inherit;font-size:.68rem;padding:3px 4px;border-radius:6px;border:1.5px solid var(--status-pending);background:var(--surface-2);color:var(--ink);max-width:220px}
+.manifest-ignored{margin-top:8px;font-size:.68rem;color:var(--ink-faint)}
+.manifest-unresolved{margin-top:8px;font-size:.71rem;color:var(--status-pending)}
+.manifest-unresolved ul{margin:4px 0 0;padding-left:18px}
 </style>
 
 <div class="login-overlay hidden" id="login-overlay">
@@ -474,15 +484,13 @@ section.panel h2{
   <div class="login-card update-card">
     <button class="update-close" id="update-close" type="button" title="Fechar">&times;</button>
     <h1>Atualizar dados de avanço</h1>
-    <p>Envie os dois arquivos gerados a partir do KMZ/planilha mais recente. A gravação usa seu login — sem senha ou chave técnica.</p>
+    <p>Selecione os arquivos .gpkg exportados do QGIS (estacas, mesas, módulos, supressão, terraplenagem). Pode selecionar por pasta, em quantas levas precisar — o painel vai acumulando. A gravação usa seu login — sem senha ou chave técnica.</p>
 
-    <label for="file-pv">Estacas, mesas, módulos — pv_compact.json</label>
-    <input type="file" id="file-pv" accept=".json,application/json">
-    <div class="update-file-status" id="status-pv">Nenhum arquivo selecionado.</div>
+    <label for="gpkg-files">Arquivos .gpkg</label>
+    <input type="file" id="gpkg-files" multiple>
+    <div class="update-file-status" id="update-summary">Nenhum arquivo selecionado.</div>
 
-    <label for="file-area">Supressão e terraplenagem — area_compact.json</label>
-    <input type="file" id="file-area" accept=".json,application/json">
-    <div class="update-file-status" id="status-area">Nenhum arquivo selecionado.</div>
+    <div id="update-manifest"></div>
 
     <label for="update-date">Data desta atualização</label>
     <input type="date" id="update-date">
@@ -685,38 +693,55 @@ if(logoutBtn){
 }
 
 /* ============================================================
-   ATUALIZAR DADOS — upload de pv_compact.json + area_compact.json,
-   gravando pelo login do usuário (RLS authenticated), sem
-   service_role key. Escopo: estacas, mesas, módulos, supressão e
-   terraplenagem — as camadas de avanço que mudam rotineiramente.
-   Base cartográfica e aterramento ficam de fora (quase estáticas).
+   ATUALIZAR DADOS — upload direto dos GeoPackage (.gpkg) exportados
+   do QGIS, gravando pelo login do usuário (RLS authenticated), sem
+   senha técnica nem service_role key. Escopo: estacas, mesas,
+   módulos, supressão e terraplenagem — as camadas de avanço que
+   mudam rotineiramente. Base cartográfica e aterramento ficam de
+   fora (quase estáticas, atualizadas manualmente à parte).
+
+   Lê os .gpkg inteiramente no navegador via sql.js (SQLite em WASM):
+   abre cada arquivo, identifica a camada por padrão no nome do
+   arquivo, extrai geometria (WKB dentro do blob GeoPackage) e
+   reprojeta SIRGAS2000/UTM 25S (31985) -> WGS84 (4326) quando
+   necessário. Nunca confia no nome interno da tabela sozinho —
+   arquivos QGIS exportados por copiar-e-colar podem trazer tabela
+   com nome errado (ex.: duplicata de outro setor); por isso, quando
+   um arquivo tem mais de uma tabela candidata, o painel obriga
+   escolha manual em vez de adivinhar.
    ============================================================ */
 (function(){
   var openBtn = document.getElementById('update-open-btn');
   var overlay = document.getElementById('update-overlay');
   var closeBtn = document.getElementById('update-close');
-  var filePv = document.getElementById('file-pv');
-  var fileArea = document.getElementById('file-area');
-  var statusPv = document.getElementById('status-pv');
-  var statusArea = document.getElementById('status-area');
+  var gpkgInput = document.getElementById('gpkg-files');
+  var manifestEl = document.getElementById('update-manifest');
+  var summaryEl = document.getElementById('update-summary');
   var dateInput = document.getElementById('update-date');
   var preview = document.getElementById('update-preview');
   var submitBtn = document.getElementById('update-submit');
   var logEl = document.getElementById('update-log');
   if(!openBtn) return;
 
-  var pvData = null, areaData = null;
   var NVs = ['01','02','03','04','05','06'];
+  var LAYER_LABELS = {estacas:'Estacas', mesas:'Mesas', modulos:'Módulos', supressao:'Supressão vegetal', terraplenagem:'Terraplenagem'};
+
+  // manifest[layer] = {'01': entry, ...} for estacas/mesas/modulos; manifest[layer] = entry for supressao/terraplenagem
+  // entry = {fileName, db, candidates:[{table,count,minx,miny,maxx,maxy}], chosenTable, srsId}
+  var manifest = {estacas:{}, mesas:{}, modulos:{}, supressao:null, terraplenagem:null};
+  var unresolved = []; // files that couldn't be auto-classified, need manual pick
+  var sqlJsReady = null;
 
   function pad2(n){ return String(n).padStart(2, '0'); }
   function todayISO(){ var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
   function todayBR(){ var d = new Date(); return pad2(d.getDate()) + '/' + pad2(d.getMonth()+1) + '/' + d.getFullYear(); }
 
   function resetPanel(){
-    pvData = null; areaData = null;
-    filePv.value = ''; fileArea.value = '';
-    statusPv.textContent = 'Nenhum arquivo selecionado.'; statusPv.className = 'update-file-status';
-    statusArea.textContent = 'Nenhum arquivo selecionado.'; statusArea.className = 'update-file-status';
+    manifest = {estacas:{}, mesas:{}, modulos:{}, supressao:null, terraplenagem:null};
+    unresolved = [];
+    gpkgInput.value = '';
+    manifestEl.innerHTML = '';
+    summaryEl.textContent = '';
     preview.hidden = true; preview.innerHTML = '';
     logEl.textContent = '';
     submitBtn.disabled = true;
@@ -727,63 +752,284 @@ if(logoutBtn){
   openBtn.addEventListener('click', function(){ resetPanel(); overlay.classList.remove('hidden'); });
   closeBtn.addEventListener('click', function(){ overlay.classList.add('hidden'); });
 
-  function readJsonFile(input, statusEl, expectedKeys, assign){
-    var file = input.files[0];
-    if(!file) return;
-    var reader = new FileReader();
-    reader.onload = function(){
-      try{
-        var data = JSON.parse(reader.result);
-        for(var i=0;i<expectedKeys.length;i++){
-          if(!(expectedKeys[i] in data)) throw new Error('faltando "' + expectedKeys[i] + '"');
-        }
-        statusEl.textContent = '✓ ' + file.name + ' — ok.';
-        statusEl.className = 'update-file-status ok';
-        assign(data);
-      }catch(err){
-        statusEl.textContent = '✗ ' + file.name + ' — arquivo inválido (' + err.message + ').';
-        statusEl.className = 'update-file-status err';
-        assign(null);
-      }
-      updatePreview();
-    };
-    reader.onerror = function(){
-      statusEl.textContent = '✗ falha ao ler o arquivo.';
-      statusEl.className = 'update-file-status err';
-      assign(null);
-      updatePreview();
-    };
-    reader.readAsText(file);
+  function ensureSqlJs(){
+    if(sqlJsReady) return sqlJsReady;
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js';
+    sqlJsReady = new Promise(function(resolve, reject){
+      script.onload = function(){
+        initSqlJs({ locateFile: function(f){ return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f; } })
+          .then(resolve, reject);
+      };
+      script.onerror = function(){ reject(new Error('falha ao carregar sql.js')); };
+    });
+    document.head.appendChild(script);
+    return sqlJsReady;
   }
 
-  filePv.addEventListener('change', function(){
-    readJsonFile(filePv, statusPv, ['estacas','mesas','modulos'], function(d){ pvData = d; });
-  });
-  fileArea.addEventListener('change', function(){
-    readJsonFile(fileArea, statusArea, ['supressao_features','terra_features'], function(d){ areaData = d; });
+  function queryAll(db, sql, params){
+    var res = db.exec(sql, params || []);
+    if(res.length === 0) return [];
+    var cols = res[0].columns, vals = res[0].values;
+    return vals.map(function(row){
+      var o = {};
+      for(var i=0;i<cols.length;i++) o[cols[i]] = row[i];
+      return o;
+    });
+  }
+
+  /* ---------- classificação por nome de arquivo ---------- */
+  function classifyFileName(name){
+    var n = name.toLowerCase();
+    var nvMatch = n.match(/nv\s*0?(\d)/);
+    var nv = nvMatch ? pad2(parseInt(nvMatch[1],10)) : null;
+    if(/estacas?/.test(n) && nv) return {layer:'estacas', nv: nv};
+    if(/mesas?/.test(n) && nv) return {layer:'mesas', nv: nv};
+    if(/m[oó]dulos?/.test(n) && nv) return {layer:'modulos', nv: nv};
+    if(/supress/.test(n)) return {layer:'supressao', nv: null};
+    if(/terraplenagem/.test(n)) return {layer:'terraplenagem', nv: null};
+    if(/aterramento|funda[cç][aã]o|funda[cç][oõ]es|kmz|\.qgz$/.test(n)) return {layer:'out_of_scope', nv: null};
+    return null;
+  }
+
+  /* ---------- geometria: GPKG blob -> WKB payload ---------- */
+  function gpkgWkbPayload(buf){
+    if(buf[0] !== 0x47 || buf[1] !== 0x50) throw new Error('não é um blob de geometria GeoPackage válido');
+    var flags = buf[3];
+    var envelopeIndicator = (flags >> 1) & 0x07;
+    var envelopeSizes = {0:0,1:32,2:48,3:48,4:64};
+    return buf.subarray(8 + envelopeSizes[envelopeIndicator]);
+  }
+  function readPointXY(wkb){
+    var dv = new DataView(wkb.buffer, wkb.byteOffset, wkb.byteLength);
+    var little = wkb[0] === 1;
+    var x = dv.getFloat64(5, little);
+    var y = dv.getFloat64(13, little);
+    return [x, y];
+  }
+  function readMultiPolygonFirstRing2D(wkb){
+    var dv = new DataView(wkb.buffer, wkb.byteOffset, wkb.byteLength);
+    var pos = 0;
+    pos += 1; // byte order of outer geom
+    pos += 4; // geom type
+    var little = wkb[0] === 1;
+    var numPolys = dv.getUint32(pos, little); pos += 4;
+    if(numPolys < 1) throw new Error('polígono vazio');
+    if(numPolys > 1) throw new Error('feição com ' + numPolys + ' partes (multipolígono real) — não suportado, precisa revisão manual no QGIS');
+    var subLittle = wkb[pos] === 1; pos += 1;
+    pos += 4; // sub geom type
+    var numRings = dv.getUint32(pos, subLittle); pos += 4;
+    if(numRings > 1) throw new Error('polígono com furo (anel interno) — não suportado, precisa revisão manual no QGIS');
+    var numPoints = dv.getUint32(pos, subLittle); pos += 4;
+    var ring = [];
+    for(var i=0;i<numPoints;i++){
+      var x = dv.getFloat64(pos, subLittle); pos += 8;
+      var y = dv.getFloat64(pos, subLittle); pos += 8;
+      pos += 8; // Z, descartado
+      ring.push([x,y]);
+    }
+    return ring;
+  }
+
+  /* ---------- reprojeção SIRGAS2000/UTM 25S (31985) -> WGS84 (4326) ---------- */
+  function utm31985ToWgs84(easting, northing){
+    var a = 6378137.0, f = 1/298.257222101, k0 = 0.9996;
+    var falseEasting = 500000.0, falseNorthing = 10000000.0;
+    var lon0 = -33 * Math.PI/180;
+    var e2 = f * (2-f), ePrime2 = e2/(1-e2);
+    var x = easting - falseEasting, y = northing - falseNorthing;
+    var M = y/k0;
+    var e1 = (1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+    var mu = M / (a*(1 - e2/4 - 3*e2*e2/64 - 5*e2*e2*e2/256));
+    var phi1 = mu
+      + (3*e1/2 - 27*e1*e1*e1/32)*Math.sin(2*mu)
+      + (21*e1*e1/16 - 55*e1*e1*e1*e1/32)*Math.sin(4*mu)
+      + (151*e1*e1*e1/96)*Math.sin(6*mu)
+      + (1097*e1*e1*e1*e1/512)*Math.sin(8*mu);
+    var sinPhi1 = Math.sin(phi1), cosPhi1 = Math.cos(phi1), tanPhi1 = Math.tan(phi1);
+    var N1 = a/Math.sqrt(1 - e2*sinPhi1*sinPhi1);
+    var T1 = tanPhi1*tanPhi1;
+    var C1 = ePrime2*cosPhi1*cosPhi1;
+    var R1 = a*(1-e2)/Math.pow(1 - e2*sinPhi1*sinPhi1, 1.5);
+    var D = x/(N1*k0);
+    var lat = phi1 - (N1*tanPhi1/R1) * (
+      D*D/2
+      - (5+3*T1+10*C1-4*C1*C1-9*ePrime2)*D*D*D*D/24
+      + (61+90*T1+298*C1+45*T1*T1-252*ePrime2-3*C1*C1)*D*D*D*D*D*D/720
+    );
+    var lon = lon0 + (
+      D
+      - (1+2*T1+C1)*D*D*D/6
+      + (5-2*C1+28*T1-3*C1*C1+8*ePrime2+24*T1*T1)*D*D*D*D*D/120
+    ) / cosPhi1;
+    return [lon*180/Math.PI, lat*180/Math.PI];
+  }
+  function toWgs84(x, y, srsId){
+    if(srsId === 4326) return [x, y];
+    if(srsId === 31985) return utm31985ToWgs84(x, y);
+    throw new Error('SRID ' + srsId + ' não suportado (esperado 4326 ou 31985) — exporte a camada em WGS84 ou SIRGAS2000/UTM 25S no QGIS');
+  }
+
+  /* ---------- abrir um .gpkg e listar tabelas candidatas ---------- */
+  function inspectGpkg(SQL, arrayBuffer){
+    var db = new SQL.Database(new Uint8Array(arrayBuffer));
+    var contents = queryAll(db, "SELECT table_name FROM gpkg_contents");
+    var geomCols = queryAll(db, "SELECT table_name, srs_id FROM gpkg_geometry_columns");
+    var srsByTable = {};
+    geomCols.forEach(function(r){ srsByTable[r.table_name] = r.srs_id; });
+    var candidates = contents.map(function(r){
+      var t = r.table_name;
+      var cnt = queryAll(db, "SELECT COUNT(*) as c FROM '" + t + "'")[0].c;
+      var ext = queryAll(db, "SELECT min_x,min_y,max_x,max_y FROM gpkg_contents WHERE table_name = ?", [t])[0];
+      return {table: t, count: cnt, srsId: srsByTable[t], bbox: ext};
+    });
+    return {db: db, candidates: candidates};
+  }
+
+  /* ---------- processar arquivos selecionados ---------- */
+  var ignoredOutOfScope = [];
+  gpkgInput.addEventListener('change', function(){
+    var files = Array.prototype.slice.call(gpkgInput.files);
+    gpkgInput.value = ''; // permite reselecionar / acumular em nova leva
+    if(files.length === 0) return;
+    summaryEl.textContent = 'Lendo ' + files.length + ' arquivo(s)…';
+    ensureSqlJs().then(function(SQL){
+      return Promise.all(files.map(function(file){
+        var cls = classifyFileName(file.name);
+        if(cls && cls.layer === 'out_of_scope'){
+          ignoredOutOfScope.push(file.name);
+          return Promise.resolve();
+        }
+        return file.arrayBuffer().then(function(buf){
+          var insp;
+          try{
+            insp = inspectGpkg(SQL, buf);
+          }catch(err){
+            unresolved.push({fileName: file.name, error: 'não é um GeoPackage válido (' + err.message + ')'});
+            return;
+          }
+          var entry = {fileName: file.name, db: insp.db, candidates: insp.candidates, chosenTable: null};
+          if(insp.candidates.length === 1){ entry.chosenTable = insp.candidates[0].table; }
+          if(!cls){
+            unresolved.push({fileName: file.name, entry: entry, error: 'nome de arquivo não reconhecido (esperado algo como "Estacas NV 0X", "Mesas NV 0X", "Modulos NV0X", "Supressão", "Terraplenagem")'});
+            return;
+          }
+          if(cls.nv){ manifest[cls.layer][cls.nv] = entry; }
+          else { manifest[cls.layer] = entry; }
+        });
+      }));
+    }).then(renderManifest).catch(function(err){
+      summaryEl.textContent = 'Erro ao ler arquivos: ' + err.message;
+    });
   });
 
-  function updatePreview(){
-    if(!pvData && !areaData){ preview.hidden = true; submitBtn.disabled = true; return; }
-    var lines = [];
-    if(pvData){
-      var totE=0, totM=0, totMo=0;
+  function bboxText(bbox){
+    if(!bbox || bbox.min_x == null) return '—';
+    return bbox.min_x.toFixed(1)+','+bbox.min_y.toFixed(1)+' … '+bbox.max_x.toFixed(1)+','+bbox.max_y.toFixed(1);
+  }
+
+  function renderManifest(){
+    var rows = [];
+    ['estacas','mesas','modulos'].forEach(function(layer){
       NVs.forEach(function(nv){
-        totE += ((pvData.estacas[nv]||{}).features||[]).length;
-        totM += ((pvData.mesas[nv]||{}).features||[]).length;
-        totMo += ((pvData.modulos[nv]||{}).features||[]).length;
+        var entry = manifest[layer][nv];
+        rows.push({layer: layer, nv: nv, entry: entry});
       });
-      lines.push('<b>Estacas:</b> ' + totE.toLocaleString('pt-BR') + ' registros');
-      lines.push('<b>Mesas:</b> ' + totM.toLocaleString('pt-BR') + ' registros');
-      lines.push('<b>Módulos:</b> ' + totMo.toLocaleString('pt-BR') + ' registros');
+    });
+    ['supressao','terraplenagem'].forEach(function(layer){
+      rows.push({layer: layer, nv: null, entry: manifest[layer]});
+    });
+
+    var html = '<table class="manifest-table"><thead><tr><th>Camada</th><th>Arquivo</th><th>Tabela</th><th></th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      var label = LAYER_LABELS[r.layer] + (r.nv ? ' NV ' + r.nv : '');
+      if(!r.entry){
+        html += '<tr class="missing"><td>' + label + '</td><td colspan="3">faltando</td></tr>';
+        return;
+      }
+      var e = r.entry;
+      var statusBadge;
+      if(e.candidates.length > 1 && !e.chosenTable){
+        var opts = '<option value="">escolher tabela…</option>' + e.candidates.map(function(c){
+          return '<option value="' + c.table + '">' + c.table + ' (' + c.count + ' feições, bbox ' + bboxText(c.bbox) + ')</option>';
+        }).join('');
+        statusBadge = '<select class="manifest-pick" data-layer="' + r.layer + '" data-nv="' + (r.nv||'') + '">' + opts + '</select>';
+      } else {
+        var chosen = e.candidates.filter(function(c){ return c.table === e.chosenTable; })[0];
+        statusBadge = '<span class="ok">✓ ' + (chosen ? chosen.count + ' feições' : '') + '</span>';
+      }
+      html += '<tr><td>' + label + '</td><td class="fname" title="' + e.fileName + '">' + e.fileName + '</td><td>' + (e.chosenTable || '—') + '</td><td>' + statusBadge + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    if(ignoredOutOfScope.length){
+      html += '<div class="manifest-ignored">Ignorado (fora do escopo desta atualização): ' + ignoredOutOfScope.join(', ') + '</div>';
     }
-    if(areaData){
-      lines.push('<b>Supressão vegetal:</b> ' + areaData.supressao_features.length.toLocaleString('pt-BR') + ' polígonos');
-      lines.push('<b>Terraplenagem:</b> ' + areaData.terra_features.length.toLocaleString('pt-BR') + ' polígonos');
+    if(unresolved.length){
+      html += '<div class="manifest-unresolved"><b>Não classificados automaticamente:</b><ul>' +
+        unresolved.map(function(u){ return '<li>' + u.fileName + ' — ' + u.error + '</li>'; }).join('') +
+        '</ul></div>';
     }
-    preview.innerHTML = lines.join('<br>');
+    manifestEl.innerHTML = html;
+
+    manifestEl.querySelectorAll('.manifest-pick').forEach(function(sel){
+      sel.addEventListener('change', function(){
+        var layer = sel.dataset.layer, nv = sel.dataset.nv;
+        var entry = nv ? manifest[layer][nv] : manifest[layer];
+        entry.chosenTable = sel.value || null;
+        renderManifest();
+      });
+    });
+
+    updateSummaryAndPreview();
+  }
+
+  function manifestComplete(){
+    for(var i=0;i<NVs.length;i++){
+      var nv = NVs[i];
+      if(!manifest.estacas[nv] || !manifest.estacas[nv].chosenTable) return false;
+      if(!manifest.mesas[nv] || !manifest.mesas[nv].chosenTable) return false;
+      if(!manifest.modulos[nv] || !manifest.modulos[nv].chosenTable) return false;
+    }
+    if(!manifest.supressao || !manifest.supressao.chosenTable) return false;
+    if(!manifest.terraplenagem || !manifest.terraplenagem.chosenTable) return false;
+    return true;
+  }
+
+  function updateSummaryAndPreview(){
+    var complete = manifestComplete();
+    if(!complete){
+      var missing = [];
+      ['estacas','mesas','modulos'].forEach(function(layer){
+        NVs.forEach(function(nv){
+          var e = manifest[layer][nv];
+          if(!e || !e.chosenTable) missing.push(LAYER_LABELS[layer] + ' NV ' + nv);
+        });
+      });
+      if(!manifest.supressao || !manifest.supressao.chosenTable) missing.push('Supressão vegetal');
+      if(!manifest.terraplenagem || !manifest.terraplenagem.chosenTable) missing.push('Terraplenagem');
+      summaryEl.textContent = missing.length ? ('Faltando: ' + missing.join(', ')) : 'Resolva as tabelas ambíguas acima.';
+      preview.hidden = true;
+      submitBtn.disabled = true;
+      return;
+    }
+    var totE=0, totM=0, totMo=0;
+    NVs.forEach(function(nv){
+      totE += manifest.estacas[nv].candidates.filter(function(c){return c.table===manifest.estacas[nv].chosenTable;})[0].count;
+      totM += manifest.mesas[nv].candidates.filter(function(c){return c.table===manifest.mesas[nv].chosenTable;})[0].count;
+      totMo += manifest.modulos[nv].candidates.filter(function(c){return c.table===manifest.modulos[nv].chosenTable;})[0].count;
+    });
+    var totSup = manifest.supressao.candidates.filter(function(c){return c.table===manifest.supressao.chosenTable;})[0].count;
+    var totTerra = manifest.terraplenagem.candidates.filter(function(c){return c.table===manifest.terraplenagem.chosenTable;})[0].count;
+    summaryEl.textContent = 'Todos os arquivos necessários foram identificados.';
+    preview.innerHTML =
+      '<b>Estacas:</b> ' + totE.toLocaleString('pt-BR') + ' registros<br>' +
+      '<b>Mesas:</b> ' + totM.toLocaleString('pt-BR') + ' registros<br>' +
+      '<b>Módulos:</b> ' + totMo.toLocaleString('pt-BR') + ' registros<br>' +
+      '<b>Supressão vegetal:</b> ' + totSup.toLocaleString('pt-BR') + ' polígonos<br>' +
+      '<b>Terraplenagem:</b> ' + totTerra.toLocaleString('pt-BR') + ' polígonos';
     preview.hidden = false;
-    submitBtn.disabled = !(pvData && areaData);
+    submitBtn.disabled = false;
   }
 
   function log(msg, cls){
@@ -840,8 +1086,76 @@ if(logoutBtn){
     }
   }
 
+  /* ---------- leitura das tabelas escolhidas -> linhas prontas para o Supabase ---------- */
+  function requireColumn(cols, name){
+    if(cols.indexOf(name) === -1) throw new Error('coluna "' + name + '" não encontrada (colunas disponíveis: ' + cols.join(', ') + ')');
+  }
+  function tableColumns(db, table){
+    return queryAll(db, "PRAGMA table_info('" + table + "')").map(function(c){ return c.name; });
+  }
+
+  function readEstacasRows(entry, nv){
+    var db = entry.db, table = entry.chosenTable;
+    var srsId = entry.candidates.filter(function(c){return c.table===table;})[0].srsId;
+    var cols = tableColumns(db, table);
+    var rows = [];
+    if(cols.indexOf('ESTE') !== -1 && cols.indexOf('NORTE') !== -1){
+      requireColumn(cols, 'CONCRETAGEM');
+      var recs = queryAll(db, "SELECT ESTE, NORTE, CONCRETAGEM FROM '" + table + "'");
+      recs.forEach(function(r){
+        var ll = toWgs84(r.ESTE, r.NORTE, srsId);
+        rows.push({nv: nv, status: r.CONCRETAGEM, geom: wktPoint(ll[0], ll[1])});
+      });
+    } else {
+      requireColumn(cols, 'CONCRETAGEM');
+      var recs2 = queryAll(db, "SELECT CONCRETAGEM, geom FROM '" + table + "'");
+      recs2.forEach(function(r){
+        var xy = readPointXY(gpkgWkbPayload(r.geom));
+        var ll = toWgs84(xy[0], xy[1], srsId);
+        rows.push({nv: nv, status: r.CONCRETAGEM, geom: wktPoint(ll[0], ll[1])});
+      });
+    }
+    return rows;
+  }
+
+  function readPolygonRows(entry, nv, statusCol){
+    var db = entry.db, table = entry.chosenTable;
+    var srsId = entry.candidates.filter(function(c){return c.table===table;})[0].srsId;
+    var cols = tableColumns(db, table);
+    requireColumn(cols, statusCol);
+    requireColumn(cols, 'geom');
+    var recs = queryAll(db, "SELECT \"" + statusCol + "\" as st, geom FROM '" + table + "'");
+    var rows = [];
+    recs.forEach(function(r){
+      var ring = readMultiPolygonFirstRing2D(gpkgWkbPayload(r.geom));
+      var ring2d = ring.map(function(p){ return toWgs84(p[0], p[1], srsId); });
+      rows.push([r.st, ring2d]);
+    });
+    return rows; // [status, ring][]
+  }
+
+  function readAreaFeatures(entry, categoriaFn){
+    var db = entry.db, table = entry.chosenTable;
+    var srsId = entry.candidates.filter(function(c){return c.table===table;})[0].srsId;
+    var cols = tableColumns(db, table);
+    requireColumn(cols, 'Name');
+    requireColumn(cols, 'geom');
+    var selectCols = categoriaFn.cols.map(function(c){ return '"' + c + '"'; }).join(', ');
+    var recs = queryAll(db, "SELECT Name, " + selectCols + ", geom FROM '" + table + "'");
+    return recs.map(function(r){
+      var ring = readMultiPolygonFirstRing2D(gpkgWkbPayload(r.geom));
+      var ring2d = ring.map(function(p){ return toWgs84(p[0], p[1], srsId); });
+      var categoria = categoriaFn(r);
+      return [categoria, r.Name || '', 0, ring2d];
+    });
+  }
+  var supressaoCategoria = function(r){ return r['LIMPEZA'] === 1 ? 'LIMPEZA' : (r['SUPRESSÃO'] === 1 ? 'SUPRESSAO' : 'PENDENTE'); };
+  supressaoCategoria.cols = ['SUPRESSÃO','LIMPEZA'];
+  var terraplenagemCategoria = function(r){ return r['TERRAPLENAGEM'] === 1 ? 'CONCLUIDO' : 'PENDENTE'; };
+  terraplenagemCategoria.cols = ['TERRAPLENAGEM'];
+
   submitBtn.addEventListener('click', function(){
-    if(!pvData || !areaData) return;
+    if(!manifestComplete()) return;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Enviando…';
     logEl.textContent = '';
@@ -850,17 +1164,13 @@ if(logoutBtn){
     (async function(){
       try{
         var estacasRows = [];
-        NVs.forEach(function(nv){
-          (pvData.estacas[nv].features||[]).forEach(function(f){
-            estacasRows.push({nv: nv, status: f[2], geom: wktPoint(f[0], f[1])});
-          });
-        });
+        NVs.forEach(function(nv){ estacasRows = estacasRows.concat(readEstacasRows(manifest.estacas[nv], nv)); });
         log('Estacas: ' + estacasRows.length + ' registros');
         await replaceTable('nv_estacas', estacasRows);
 
         var mesasRows = [];
         NVs.forEach(function(nv){
-          (pvData.mesas[nv].features||[]).forEach(function(f){
+          readPolygonRows(manifest.mesas[nv], nv, 'STATUS').forEach(function(f){
             mesasRows.push({nv: nv, status: f[0], geom: wktPolygon(f[1])});
           });
         });
@@ -869,21 +1179,23 @@ if(logoutBtn){
 
         var modulosRows = [];
         NVs.forEach(function(nv){
-          (pvData.modulos[nv].features||[]).forEach(function(f){
+          readPolygonRows(manifest.modulos[nv], nv, 'STATUS').forEach(function(f){
             modulosRows.push({nv: nv, status: f[0], geom: wktPolygon(f[1])});
           });
         });
         log('Módulos: ' + modulosRows.length + ' registros (maior lote, pode levar um pouco)');
         await replaceTable('nv_modulos', modulosRows);
 
-        var supRows = areaData.supressao_features.map(function(f){
+        var supFeatures = readAreaFeatures(manifest.supressao, supressaoCategoria);
+        var supRows = supFeatures.map(function(f){
           var sn = normalizeSetor(f[1]);
           return {setor_key: sn[0], setor_label: sn[1], categoria: f[0], geom: wktPolygon(f[3])};
         });
         log('Supressão vegetal: ' + supRows.length + ' polígonos');
         await replaceTable('supressao', supRows);
 
-        var terraRows = areaData.terra_features.map(function(f){
+        var terraFeatures = readAreaFeatures(manifest.terraplenagem, terraplenagemCategoria);
+        var terraRows = terraFeatures.map(function(f){
           var sn = normalizeSetor(f[1]);
           return {setor_key: sn[0], setor_label: sn[1], categoria: f[0], geom: wktPolygon(f[3])};
         });
@@ -912,6 +1224,7 @@ if(logoutBtn){
     })();
   });
 })();
+
 
 sb.auth.onAuthStateChange(function(_event, session){
   if(session && !appBooted){
