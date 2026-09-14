@@ -291,6 +291,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .nv-card .nv-name{font-family:var(--font-head);font-weight:600;font-size:20px;color:var(--primary);line-height:1}
 .nv-card .nv-bars{display:flex;flex-direction:column;gap:5px}
 .nv-card .mini{display:grid;grid-template-columns:44px minmax(0,1fr) 70px;gap:6px;align-items:center;font-size:11px;color:var(--ink-muted)}
+.fundacoes-card .mini{grid-template-columns:112px minmax(0,1fr) 56px}
 .nv-card .mini .mini-val{text-align:right;font-variant-numeric:tabular-nums}
 .nv-card .nv-right{text-align:right}
 .nv-card .nv-pct{font-family:var(--font-head);font-weight:600;font-size:22px;line-height:1}
@@ -1533,7 +1534,7 @@ async function boot(){
       var pct = totalAll ? 100*totalDone/totalAll : 0;
       var color = pctColor(pct);
       var card = document.createElement('div');
-      card.className = 'nv-card';
+      card.className = 'nv-card fundacoes-card';
       card.style.cursor = 'default';
       card.innerHTML =
         '<span class="nv-name">' + label + '</span>' +
