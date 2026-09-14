@@ -627,13 +627,13 @@ function fmtArea(n){ return Math.round(n).toLocaleString('pt-BR') + ' m²'; }
 
 var NV_KEYS = ['01','02','03','04','05','06'];
 
-var C_DONE = '#158a3e', C_PROG = '#5980a6', C_NONE = '#9a9a9e';
+var C_DONE = '#158a3e', C_PROG = '#5980a6', C_NONE = '#9a9a9e', C_DONE_TERRA = '#B5622D', C_DONE_SUPRESSAO = '#6B7A3A', C_DONE_MESAS = '#6B4C7A';
 var COLORS = {
   estacas: {'0': C_NONE, '1': C_DONE},
-  mesas: {'0': C_NONE, '1': C_DONE},
+  mesas: {'0': C_NONE, '1': C_DONE_MESAS},
   modulos: {'0': C_NONE, '1': C_DONE},
-  supressao: {'PENDENTE': C_NONE, 'SUPRESSAO': C_PROG, 'LIMPEZA': C_DONE},
-  terraplenagem: {'PENDENTE': C_NONE, 'CONCLUIDO': C_DONE},
+  supressao: {'PENDENTE': C_NONE, 'SUPRESSAO': C_PROG, 'LIMPEZA': C_DONE_SUPRESSAO},
+  terraplenagem: {'PENDENTE': C_NONE, 'CONCLUIDO': C_DONE_TERRA},
   aterramento: {'0': C_NONE, '1': C_DONE},
 };
 
@@ -1548,14 +1548,14 @@ async function boot(){
       legend:[{sw:C_DONE, label:'NV concluído'},{sw:C_PROG, label:'NV em andamento'},{sw:'none', label:'NV não iniciado'}]},
     {key:'estacas', name:'Estacas', hint:'', dots:[C_DONE, C_NONE], defaultOn:true,
       legend:[{sw:C_DONE, label:'Estaca concretada', dot:true},{sw:C_NONE, label:'Estaca não iniciada', dot:true}]},
-    {key:'mesas', name:'Mesas', hint:'', dots:[C_DONE, C_NONE], defaultOn:true, sq:true,
-      legend:[{sw:C_DONE, label:'Mesa instalada'},{sw:C_NONE, label:'Mesa não iniciada'}]},
+    {key:'mesas', name:'Mesas', hint:'', dots:[C_DONE_MESAS, C_NONE], defaultOn:true, sq:true,
+      legend:[{sw:C_DONE_MESAS, label:'Mesa instalada'},{sw:C_NONE, label:'Mesa não iniciada'}]},
     {key:'modulos', name:'Módulos fotovoltaicos', hint:'carrega ~31 mil feições — pode demorar', dots:[C_DONE, C_NONE], defaultOn:false, sq:true, heavy:true,
       legend:[{sw:C_DONE, label:'Módulo instalado'},{sw:C_NONE, label:'Módulo não instalado'}]},
-    {key:'supressao', name:'Supressão vegetal', hint:'', dots:[C_DONE, C_PROG, C_NONE], defaultOn:true, sq:true,
-      legend:[{sw:C_DONE, label:'Supressão + limpeza concluídas'},{sw:C_PROG, label:'Suprimido, limpeza pendente'},{sw:C_NONE, label:'Supressão pendente'}]},
-    {key:'terraplenagem', name:'Terraplenagem', hint:'', dots:[C_DONE, C_NONE], defaultOn:true, sq:true,
-      legend:[{sw:C_DONE, label:'Terraplenagem concluída'},{sw:C_NONE, label:'Terraplenagem pendente'}]},
+    {key:'supressao', name:'Supressão vegetal', hint:'', dots:[C_DONE_SUPRESSAO, C_PROG, C_NONE], defaultOn:true, sq:true,
+      legend:[{sw:C_DONE_SUPRESSAO, label:'Supressão + limpeza concluídas'},{sw:C_PROG, label:'Suprimido, limpeza pendente'},{sw:C_NONE, label:'Supressão pendente'}]},
+    {key:'terraplenagem', name:'Terraplenagem', hint:'', dots:[C_DONE_TERRA, C_NONE], defaultOn:true, sq:true,
+      legend:[{sw:C_DONE_TERRA, label:'Terraplenagem concluída'},{sw:C_NONE, label:'Terraplenagem pendente'}]},
     {key:'aterramento', name:'Aterramento SE/BESS', hint:'', dots:[C_DONE, C_NONE], defaultOn:false, ln:true,
       legend:[{sw:C_DONE, label:'Malha executada', ln:true},{sw:C_NONE, label:'Malha não iniciada', ln:true}]},
   ];
