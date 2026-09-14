@@ -389,12 +389,35 @@ section.panel h2{
 /* ---------- login overlay ---------- */
 .login-overlay{
   position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;
-  background:var(--bg);padding:20px;
+  background:var(--bg);padding:20px;overflow:hidden;
 }
 .login-overlay.hidden{display:none}
+.login-overlay::before{
+  content:"";position:absolute;inset:-6%;
+  background-image:url('assets/image.jpg');
+  background-size:cover;background-position:center;
+  filter:saturate(.92) brightness(.96);
+  animation:login-bg-pan 42s ease-in-out infinite alternate;
+}
+.login-overlay::after{
+  content:"";position:absolute;inset:0;background:var(--bg);opacity:.6;
+}
+@keyframes login-bg-pan{
+  from{transform:scale(1.06) translate(0,0)}
+  to{transform:scale(1.16) translate(-1.6%,-1.2%)}
+}
+@media (prefers-reduced-motion: reduce){
+  .login-overlay::before{animation:none}
+  .login-card{animation:none}
+}
 .login-card{
   width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);
   border-radius:14px;box-shadow:var(--shadow);padding:28px 26px;
+  position:relative;z-index:1;animation:login-card-in .5s cubic-bezier(.16,1,.3,1);
+}
+@keyframes login-card-in{
+  from{opacity:0;transform:translateY(8px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
 }
 .login-card h1{font-size:1.05rem;margin:0 0 4px;color:var(--ink)}
 .login-card p{font-size:.78rem;color:var(--ink-muted);margin:0 0 20px}
