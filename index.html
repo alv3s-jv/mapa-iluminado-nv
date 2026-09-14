@@ -234,9 +234,12 @@ button{font-family:inherit}
 /* ---------- LAYOUT ---------- */
 .body-row{display:flex;flex:1;min-height:0}
 .sidebar{
-  width:376px;flex:none;background:var(--surface);border-right:1px solid var(--border);
+  width:376px;max-width:90vw;flex:none;background:var(--surface);border-right:1px solid var(--border);
   display:flex;flex-direction:column;min-height:0;
+  position:fixed;top:0;left:0;bottom:0;z-index:900;transform:translateX(-100%);
+  transition:transform .2s;box-shadow:var(--shadow);padding-top:env(safe-area-inset-top);
 }
+.sidebar.open{transform:translateX(0)}
 .sidebar-scroll{
   overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:16px calc(16px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
@@ -304,16 +307,19 @@ section.panel h2{
 .highlight-card .bar-track{height:8px;margin-top:10px}
 .highlight-card .hl-detail{font-size:.68rem;color:var(--ink-muted);margin-top:8px;line-height:1.4}
 
-/* resumo geral do projeto — faixa de KPIs */
-.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.summary-card{
-  background:var(--surface-2);border:1px solid var(--border);border-left:5px solid var(--ink-faint);
-  border-radius:12px;padding:12px 13px;
+/* resumo geral do projeto — faixa horizontal de % no topo */
+.kpi-bar{
+  display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  background:var(--surface);border-bottom:1px solid var(--border);padding:0 6px;
 }
-.summary-card .sm-label{font-size:.68rem;font-weight:700;color:var(--ink);display:block;margin-bottom:4px}
-.summary-card .sm-pct{font-size:1.5rem;font-weight:700;line-height:1}
-.summary-card .sm-pct small{font-size:.62rem;font-weight:600;color:var(--ink-faint)}
-.summary-card .sm-detail{font-size:.66rem;color:var(--ink-muted);margin-top:4px}
+.kpi-chip{
+  display:flex;align-items:center;gap:8px;padding:10px 16px;border-right:1px solid var(--border);
+  flex:none;white-space:nowrap;
+}
+.kpi-chip:last-child{border-right:none}
+.kpi-chip .k-label{font-size:.68rem;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em}
+.kpi-chip .k-pct{font-size:.95rem;font-weight:700}
+.kpi-chip .k-pct small{font-size:.6rem;font-weight:600;color:var(--ink-faint);margin-left:1px}
 
 /* NV cards */
 .nv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -359,7 +365,7 @@ section.panel h2{
 .legend-row{display:flex;align-items:center;gap:7px;margin:3px 0;color:var(--ink-muted)}
 .sidebar-toggle{
   top:calc(14px + env(safe-area-inset-top));left:calc(14px + env(safe-area-inset-left));
-  width:42px;height:42px;display:none;align-items:center;justify-content:center;cursor:pointer;
+  width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
 .theme-toggle{
   top:calc(14px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));
@@ -385,13 +391,6 @@ section.panel h2{
 .popup-row{display:flex;justify-content:space-between;gap:10px;color:var(--ink-muted)}
 
 @media (max-width:900px){
-  .sidebar{
-    position:fixed;top:0;left:0;bottom:0;z-index:900;transform:translateX(-100%);
-    transition:transform .2s;box-shadow:var(--shadow);
-    max-width:90vw;padding-top:env(safe-area-inset-top);
-  }
-  .sidebar.open{transform:translateX(0)}
-  .sidebar-toggle{display:flex}
   .updated-badge{margin-left:0}
   /* iOS Safari zooms the page when a focused input has font-size < 16px */
   .search input{font-size:16px}
@@ -565,14 +564,11 @@ section.panel h2{
     </div>
   </header>
 
+  <div class="kpi-bar" id="kpi-bar"></div>
+
   <div class="body-row">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-scroll">
-
-        <section class="panel">
-          <h2>Resumo geral do projeto</h2>
-          <div class="summary-grid" id="summary-grid"></div>
-        </section>
 
         <section class="panel">
           <div class="search">
@@ -1342,10 +1338,10 @@ async function boot(){
   /* ---------- global KPIs ---------- */
   document.getElementById('updated-at').textContent = DATA.updated_at;
 
-  /* ---------- resumo geral do projeto (faixa de KPIs, % + contagem) ---------- */
+  /* ---------- resumo geral do projeto (faixa horizontal, só %) ---------- */
   (function(){
-    var grid = document.getElementById('summary-grid');
-    if(!grid) return;
+    var bar = document.getElementById('kpi-bar');
+    if(!bar) return;
 
     function sumLayer(key){
       var done = 0, total = 0;
@@ -1353,7 +1349,7 @@ async function boot(){
         var d = DATA.nv[nv];
         if(d && d[key]){ done += d[key].done || 0; total += d[key].total || 0; }
       });
-      return {done: done, total: total, pct: total ? 100 * done / total : 0};
+      return total ? 100 * done / total : 0;
     }
 
     var st = DATA.supressao.totals;
@@ -1364,24 +1360,19 @@ async function boot(){
     var ttTotal = (tt.CONCLUIDO||0) + (tt.PENDENTE||0);
     var ttPct = ttTotal ? 100 * (tt.CONCLUIDO||0) / ttTotal : 0;
 
-    var estacas = sumLayer('estacas');
-    var mesas = sumLayer('mesas');
-    var modulos = sumLayer('modulos');
-
-    var cards = [
-      {label: 'Estacas', pct: estacas.pct, detail: estacas.done.toLocaleString('pt-BR') + ' de ' + estacas.total.toLocaleString('pt-BR') + ' concretadas'},
-      {label: 'Mesas', pct: mesas.pct, detail: mesas.done.toLocaleString('pt-BR') + ' de ' + mesas.total.toLocaleString('pt-BR') + ' instaladas'},
-      {label: 'Módulos', pct: modulos.pct, detail: modulos.done.toLocaleString('pt-BR') + ' de ' + modulos.total.toLocaleString('pt-BR') + ' instalados'},
-      {label: 'Supressão vegetal', pct: stPct, detail: fmtArea(st.LIMPEZA||0) + ' limpos de ' + fmtArea(stTotal)},
-      {label: 'Terraplenagem', pct: ttPct, detail: fmtArea(tt.CONCLUIDO||0) + ' de ' + fmtArea(ttTotal)},
+    var items = [
+      {label: 'Estacas', pct: sumLayer('estacas')},
+      {label: 'Mesas', pct: sumLayer('mesas')},
+      {label: 'Módulos', pct: sumLayer('modulos')},
+      {label: 'Supressão vegetal', pct: stPct},
+      {label: 'Terraplenagem', pct: ttPct},
     ];
 
-    grid.innerHTML = cards.map(function(c){
-      var color = pctColor(c.pct);
-      return '<div class="summary-card" style="border-left-color:' + color + '">' +
-        '<span class="sm-label">' + c.label + '</span>' +
-        '<div class="sm-pct" style="color:' + color + '">' + fmtPct(c.pct) + '<small>%</small></div>' +
-        '<div class="sm-detail">' + c.detail + '</div>' +
+    bar.innerHTML = items.map(function(it){
+      var color = pctColor(it.pct);
+      return '<div class="kpi-chip">' +
+        '<span class="k-label">' + it.label + '</span>' +
+        '<span class="k-pct" style="color:' + color + '">' + fmtPct(it.pct) + '<small>%</small></span>' +
       '</div>';
     }).join('');
   })();
@@ -1672,7 +1663,7 @@ async function boot(){
     var b = DATA.nv_bounds[nv]; if(!b) return;
     var bounds = L.latLngBounds([b.bbox[0], b.bbox[1]], [b.bbox[2], b.bbox[3]]);
     map.flyToBounds(bounds.pad(0.35), {duration: 0.6});
-    if(window.innerWidth <= 900) sidebar.classList.remove('open');
+    sidebar.classList.remove('open');
   }
 
   /* ---------- frentes tables ---------- */
