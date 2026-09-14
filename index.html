@@ -515,6 +515,14 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <h2>Avanço por NV <span class="h2-note">estacas · mesas · módulos</span></h2>
             <div class="nv-grid" id="nv-grid"></div>
           </section>
+          <section class="panel">
+            <h2>Fundações — BESS <span class="h2-note">por tipo de estrutura</span></h2>
+            <div class="nv-grid" id="bess-grid"></div>
+          </section>
+          <section class="panel">
+            <h2>Fundações — SE Noronha Verde <span class="h2-note">por tipo de estrutura</span></h2>
+            <div class="nv-grid" id="senv-grid"></div>
+          </section>
           <div class="legend-note"><b>Metodologia.</b> Avanço de estacas, mesas e módulos por contagem de unidades; consolidado por NV como média simples dos três percentuais. Toque no NV para centralizar no mapa.</div>
         </div>
 
@@ -1498,6 +1506,44 @@ async function boot(){
       }).bindPopup('<div class="popup-title">' + name + ' — ' + local + '</div><div class="popup-row"><span>Status</span><b>' + statusLabel + '</b></div><div class="popup-row"><span>Área</span><b>' + fmtArea(area) + '</b></div><div class="popup-row" style="flex-direction:column;align-items:flex-start;gap:4px"><span>Etapas</span><div style="font-size:11px;line-height:1.6">' + checklist + '</div></div>')
         .addTo(layerGroups.fundacoes_bess);
     });
+    renderFundacoesQuadros(res.data);
+  }
+  function renderFundacoesQuadros(rows){
+    var byLocal = {};
+    (rows||[]).forEach(function(f){
+      var name=f[1], local=f[2], stages=f[4];
+      if(!byLocal[local]) byLocal[local] = {};
+      if(!byLocal[local][name]) byLocal[local][name] = [0,0];
+      byLocal[local][name][1]++;
+      if(stages.finalizado) byLocal[local][name][0]++;
+    });
+    function miniBarType(lbl, done, total){
+      var p = total ? 100*done/total : 0;
+      return '<div class="mini"><span>' + lbl + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + p + '%;background:' + pctColor(p) + '"></div></div>' +
+        '<span class="mini-val">' + fmtInt(done) + ' / ' + fmtInt(total) + '</span></div>';
+    }
+    function buildCard(elId, local, label){
+      var grid = document.getElementById(elId);
+      if(!grid) return;
+      var byType = byLocal[local] || {};
+      var types = Object.keys(byType).sort();
+      var totalDone=0, totalAll=0;
+      types.forEach(function(t){ totalDone += byType[t][0]; totalAll += byType[t][1]; });
+      var pct = totalAll ? 100*totalDone/totalAll : 0;
+      var color = pctColor(pct);
+      var card = document.createElement('div');
+      card.className = 'nv-card';
+      card.style.cursor = 'default';
+      card.innerHTML =
+        '<span class="nv-name">' + label + '</span>' +
+        '<div class="nv-bars">' + types.map(function(t){ var g = byType[t]; return miniBarType(t, g[0], g[1]); }).join('') + '</div>' +
+        '<div class="nv-right"><div class="nv-pct" style="color:' + color + '">' + fmtPct(pct) + '<small>%</small></div><div class="nv-status">' + pctStatus(pct) + '</div></div>';
+      grid.innerHTML = '';
+      grid.appendChild(card);
+    }
+    buildCard('bess-grid', 'BESS', 'BESS');
+    buildCard('senv-grid', 'SE NORONHA VERDE', 'SE Noronha Verde');
   }
   async function buildAterramento(){
     var [linhasRes, pontosRes] = await Promise.all([
