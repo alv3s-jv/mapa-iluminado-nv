@@ -483,7 +483,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         <span><span class="long">Atualizado em </span><b id="updated-at">–</b></span>
       </div>
-      <button class="btn" id="update-open-btn" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 9l6-6 6 6M4 21h16"/></svg><span class="btn-text">Atualizar dados</span></button>
+      <button class="btn" id="update-open-btn" type="button" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 9l6-6 6 6M4 21h16"/></svg><span class="btn-text">Atualizar dados</span></button>
       <button class="logout-link" id="logout-btn" type="button">Sair</button>
     </div>
   </header>
@@ -1220,9 +1220,9 @@ sb.auth.onAuthStateChange(function(_event, session){
     appBooted = true;
     loginOverlay.classList.add('hidden');
     sb.from('app_editors').select('user_id').eq('user_id', session.user.id).maybeSingle().then(function(res){
-      if(!res.error && !res.data){
+      if(!res.error && res.data){
         var btn = document.getElementById('update-open-btn');
-        if(btn) btn.hidden = true;
+        if(btn) btn.hidden = false;
       }
     }).catch(function(){});
     boot().catch(function(err){
