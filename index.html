@@ -1230,6 +1230,12 @@ sb.auth.onAuthStateChange(function(_event, session){
   if(session && !appBooted){
     appBooted = true;
     loginOverlay.classList.add('hidden');
+    sb.from('app_editors').select('user_id').eq('user_id', session.user.id).maybeSingle().then(function(res){
+      if(!res.error && !res.data){
+        var btn = document.getElementById('update-open-btn');
+        if(btn) btn.hidden = true;
+      }
+    }).catch(function(){});
     boot().catch(function(err){
       console.error(err);
       showFatalError('Falha ao carregar os dados do mapa. Verifique sua conexão e recarregue a página.');
