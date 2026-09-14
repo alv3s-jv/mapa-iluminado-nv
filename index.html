@@ -637,7 +637,7 @@ function fmtArea(n){ return Math.round(n).toLocaleString('pt-BR') + ' m²'; }
 
 var NV_KEYS = ['01','02','03','04','05','06'];
 
-var C_DONE = '#158a3e', C_PROG = '#5980a6', C_NONE = '#9a9a9e', C_DONE_TERRA = '#B5622D', C_DONE_SUPRESSAO = '#6B7A3A', C_DONE_MESAS = '#6B4C7A';
+var C_DONE = '#158a3e', C_PROG = '#5980a6', C_NONE = '#9a9a9e', C_DONE_TERRA = '#B5622D', C_DONE_SUPRESSAO = '#6B7A3A', C_DONE_MESAS = '#6B4C7A', C_DONE_BESS = '#1F8A8A';
 var COLORS = {
   estacas: {'0': C_NONE, '1': C_DONE},
   mesas: {'0': C_NONE, '1': C_DONE_MESAS},
@@ -645,6 +645,7 @@ var COLORS = {
   supressao: {'PENDENTE': C_NONE, 'SUPRESSAO': C_PROG, 'LIMPEZA': C_DONE_SUPRESSAO},
   terraplenagem: {'PENDENTE': C_NONE, 'CONCLUIDO': C_DONE_TERRA},
   aterramento: {'0': C_NONE, '1': C_DONE},
+  fundacoes_bess: {'PENDENTE': C_NONE, 'ANDAMENTO': C_PROG, 'CONCLUIDO': C_DONE_BESS},
 };
 
 /* ============================================================
@@ -1383,6 +1384,7 @@ async function boot(){
     supressao: L.layerGroup(),
     terraplenagem: L.layerGroup(),
     aterramento: L.layerGroup(),
+    fundacoes_bess: L.layerGroup(),
     badges: L.layerGroup(),
   };
   var built = {};
@@ -1482,6 +1484,21 @@ async function boot(){
         .addTo(layerGroups.terraplenagem);
     });
   }
+  async function buildFundacoesBess(){
+    var res = await sb.rpc('get_fundacoes_bess_features');
+    if(res.error) throw res.error;
+    var STAGES = [['escavacao','Escavação'],['magro','Lastro (magro)'],['armacao','Armação'],['concretagem_estrutural','Concretagem'],['acabamento','Acabamento'],['finalizado','Finalizado']];
+    (res.data||[]).forEach(function(f){
+      var status=f[0], name=f[1], local=f[2], area=f[3], stages=f[4], ring=f[5];
+      var statusLabel = status==='CONCLUIDO' ? 'Concluída' : (status==='ANDAMENTO' ? 'Em execução' : 'Pendente');
+      var checklist = STAGES.map(function(s){ return '<span style="opacity:' + (stages[s[0]]?1:.4) + '">' + (stages[s[0]]?'✓':'○') + ' ' + s[1] + '</span>'; }).join(' &nbsp; ');
+      L.polygon(ring.map(ll), {
+        renderer: canvasRenderer, weight: 1.2, color:'#ffffffaa',
+        fillColor: DATA.colors.fundacoes_bess[status], fillOpacity: .65,
+      }).bindPopup('<div class="popup-title">' + name + ' — ' + local + '</div><div class="popup-row"><span>Status</span><b>' + statusLabel + '</b></div><div class="popup-row"><span>Área</span><b>' + fmtArea(area) + '</b></div><div class="popup-row" style="flex-direction:column;align-items:flex-start;gap:4px"><span>Etapas</span><div style="font-size:11px;line-height:1.6">' + checklist + '</div></div>')
+        .addTo(layerGroups.fundacoes_bess);
+    });
+  }
   async function buildAterramento(){
     var [linhasRes, pontosRes] = await Promise.all([
       sb.rpc('get_aterramento_linhas'),
@@ -1531,7 +1548,7 @@ async function boot(){
   var BUILDERS = {
     kmzbase: buildKmzBase,
     estacas: buildEstacas, mesas: buildMesas, modulos: buildModulos,
-    supressao: buildSupressao, terraplenagem: buildTerra, aterramento: buildAterramento,
+    supressao: buildSupressao, terraplenagem: buildTerra, aterramento: buildAterramento, fundacoes_bess: buildFundacoesBess,
     badges: async function(){ buildBadges(); },
   };
 
@@ -1566,6 +1583,8 @@ async function boot(){
       legend:[{sw:C_DONE_SUPRESSAO, label:'Supressão + limpeza concluídas'},{sw:C_PROG, label:'Suprimido, limpeza pendente'},{sw:C_NONE, label:'Supressão pendente'}]},
     {key:'terraplenagem', name:'Terraplenagem', hint:'', dots:[C_DONE_TERRA, C_NONE], defaultOn:true, sq:true,
       legend:[{sw:C_DONE_TERRA, label:'Terraplenagem concluída'},{sw:C_NONE, label:'Terraplenagem pendente'}]},
+    {key:'fundacoes_bess', name:'Fundações do BESS', hint:'', dots:[C_DONE_BESS, C_PROG, C_NONE], defaultOn:true, sq:true,
+      legend:[{sw:C_DONE_BESS, label:'Fundação concluída'},{sw:C_PROG, label:'Fundação em execução'},{sw:C_NONE, label:'Fundação pendente'}]},
     {key:'aterramento', name:'Aterramento SE/BESS', hint:'', dots:[C_DONE, C_NONE], defaultOn:false, ln:true,
       legend:[{sw:C_DONE, label:'Malha executada', ln:true},{sw:C_NONE, label:'Malha não iniciada', ln:true}]},
   ];
