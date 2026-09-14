@@ -291,6 +291,10 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .nv-card .nv-name{font-family:var(--font-head);font-weight:600;font-size:20px;color:var(--primary);line-height:1}
 .nv-card .nv-bars{display:flex;flex-direction:column;gap:5px}
 .nv-card .mini{display:grid;grid-template-columns:44px minmax(0,1fr) 70px;gap:6px;align-items:center;font-size:11px;color:var(--ink-muted)}
+.fundacoes-card{display:block;cursor:default}
+.fundacoes-card .fundacoes-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.fundacoes-card .fundacoes-head .nv-name{font-size:18px;line-height:1.15}
+.fundacoes-card .fundacoes-bar{margin:10px 0 12px}
 .fundacoes-card .mini{grid-template-columns:112px minmax(0,1fr) 56px}
 .nv-card .mini .mini-val{text-align:right;font-variant-numeric:tabular-nums}
 .nv-card .nv-right{text-align:right}
@@ -1537,9 +1541,10 @@ async function boot(){
       card.className = 'nv-card fundacoes-card';
       card.style.cursor = 'default';
       card.innerHTML =
-        '<span class="nv-name">' + label + '</span>' +
-        '<div class="nv-bars">' + types.map(function(t){ var g = byType[t]; return miniBarType(t, g[0], g[1]); }).join('') + '</div>' +
-        '<div class="nv-right"><div class="nv-pct" style="color:' + color + '">' + fmtPct(pct) + '<small>%</small></div><div class="nv-status">' + pctStatus(pct) + '</div></div>';
+        '<div class="fundacoes-head"><span class="nv-name">' + label + '</span>' +
+        '<div class="nv-right"><div class="nv-pct" style="color:' + color + '">' + fmtPct(pct) + '<small>%</small></div><div class="nv-status">' + pctStatus(pct) + '</div></div></div>' +
+        '<div class="bar-track fundacoes-bar"><div class="bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+        '<div class="nv-bars">' + types.map(function(t){ var g = byType[t]; return miniBarType(t, g[0], g[1]); }).join('') + '</div>';
       grid.innerHTML = '';
       grid.appendChild(card);
     }
