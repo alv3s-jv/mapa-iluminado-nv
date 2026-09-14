@@ -643,7 +643,7 @@ var COLORS = {
 var SUPABASE_URL = "https://yggzgjjwstmchcncgcvv.supabase.co";
 var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlnZ3pnamp3c3RtY2hjbmNnY3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5Mzc1MTIsImV4cCI6MjEwNDUxMzUxMn0.CJPpdPrlkXwrcps_U0Lf0gB0aWu3uyy6v3MqGrmhj3Y";
 var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false }
+  auth: { persistSession: true, storage: window.sessionStorage }
 });
 
 var loginOverlay = document.getElementById('login-overlay');
