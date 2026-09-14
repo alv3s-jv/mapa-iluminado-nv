@@ -431,8 +431,19 @@ section.panel h2{
   width:100%;margin-top:20px;padding:11px;border:none;border-radius:8px;
   background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:.85rem;
   cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:background-color .15s;
 }
 .login-card button:disabled{opacity:.6;cursor:default}
+.btn-spinner{
+  display:none;width:14px;height:14px;border-radius:50%;flex:none;
+  border:2px solid rgba(244,248,251,.35);border-top-color:var(--primary-ink);
+  animation:layer-spin .7s linear infinite;
+}
+.login-card button.loading .btn-spinner{display:inline-block}
+@media (prefers-reduced-motion: reduce){
+  .btn-spinner{animation:none;border-top-color:rgba(244,248,251,.35)}
+}
 .login-error{color:var(--status-pending);font-size:.75rem;margin-top:10px;min-height:1em}
 .fatal-error{
   position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:3000;
@@ -498,7 +509,7 @@ section.panel h2{
       <input id="login-email" type="email" autocomplete="username" required>
       <label for="login-password">Senha</label>
       <input id="login-password" type="password" autocomplete="current-password" required>
-      <button id="login-submit" type="submit">Entrar</button>
+      <button id="login-submit" type="submit"><span class="btn-spinner" aria-hidden="true"></span><span id="login-submit-label">Entrar</span></button>
       <div class="login-error" id="login-error"></div>
     </form>
   </div>
@@ -689,6 +700,7 @@ var loginOverlay = document.getElementById('login-overlay');
 var loginForm = document.getElementById('login-form');
 var loginError = document.getElementById('login-error');
 var loginSubmit = document.getElementById('login-submit');
+var loginSubmitLabel = document.getElementById('login-submit-label');
 var logoutBtn = document.getElementById('logout-btn');
 
 var appBooted = false;
@@ -699,10 +711,12 @@ loginForm.addEventListener('submit', function(e){
   var password = document.getElementById('login-password').value;
   loginError.textContent = '';
   loginSubmit.disabled = true;
-  loginSubmit.textContent = 'Entrando…';
+  loginSubmit.classList.add('loading');
+  loginSubmitLabel.textContent = 'Entrando…';
   sb.auth.signInWithPassword({ email: email, password: password }).then(function(res){
     loginSubmit.disabled = false;
-    loginSubmit.textContent = 'Entrar';
+    loginSubmit.classList.remove('loading');
+    loginSubmitLabel.textContent = 'Entrar';
     if(res.error){
       loginError.textContent = 'Login ou senha incorretos.';
       return;
