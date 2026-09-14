@@ -595,8 +595,6 @@ document.getElementById('theme-toggle').addEventListener('click', function(){
 });
 
 var sidebar = document.getElementById('sidebar');
-var isDesktop = function(){ return window.innerWidth >= 1024; };
-if(isDesktop()) sidebar.classList.add('open');
 document.getElementById('sidebar-toggle').addEventListener('click', function(){
   sidebar.classList.toggle('open');
 });
@@ -1631,7 +1629,7 @@ async function boot(){
     var b = DATA.nv_bounds[nv]; if(!b) return;
     var bounds = L.latLngBounds([b.bbox[0], b.bbox[1]], [b.bbox[2], b.bbox[3]]);
     map.flyToBounds(bounds.pad(0.35), {duration: 0.6});
-    if(!isDesktop()) sidebar.classList.remove('open');
+    sidebar.classList.remove('open');
   }
   document.getElementById('fit-btn').addEventListener('click', function(){
     if(overallBounds) map.flyToBounds(overallBounds.pad(0.15), {duration: 0.6});
