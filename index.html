@@ -304,6 +304,17 @@ section.panel h2{
 .highlight-card .bar-track{height:8px;margin-top:10px}
 .highlight-card .hl-detail{font-size:.68rem;color:var(--ink-muted);margin-top:8px;line-height:1.4}
 
+/* resumo geral do projeto — faixa de KPIs */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.summary-card{
+  background:var(--surface-2);border:1px solid var(--border);border-left:5px solid var(--ink-faint);
+  border-radius:12px;padding:12px 13px;
+}
+.summary-card .sm-label{font-size:.68rem;font-weight:700;color:var(--ink);display:block;margin-bottom:4px}
+.summary-card .sm-pct{font-size:1.5rem;font-weight:700;line-height:1}
+.summary-card .sm-pct small{font-size:.62rem;font-weight:600;color:var(--ink-faint)}
+.summary-card .sm-detail{font-size:.66rem;color:var(--ink-muted);margin-top:4px}
+
 /* NV cards */
 .nv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .nv-card{
@@ -557,6 +568,11 @@ section.panel h2{
   <div class="body-row">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-scroll">
+
+        <section class="panel">
+          <h2>Resumo geral do projeto</h2>
+          <div class="summary-grid" id="summary-grid"></div>
+        </section>
 
         <section class="panel">
           <div class="search">
@@ -1325,6 +1341,50 @@ async function boot(){
 
   /* ---------- global KPIs ---------- */
   document.getElementById('updated-at').textContent = DATA.updated_at;
+
+  /* ---------- resumo geral do projeto (faixa de KPIs, % + contagem) ---------- */
+  (function(){
+    var grid = document.getElementById('summary-grid');
+    if(!grid) return;
+
+    function sumLayer(key){
+      var done = 0, total = 0;
+      NV_KEYS.forEach(function(nv){
+        var d = DATA.nv[nv];
+        if(d && d[key]){ done += d[key].done || 0; total += d[key].total || 0; }
+      });
+      return {done: done, total: total, pct: total ? 100 * done / total : 0};
+    }
+
+    var st = DATA.supressao.totals;
+    var stTotal = (st.LIMPEZA||0) + (st.SUPRESSAO||0) + (st.PENDENTE||0);
+    var stPct = stTotal ? 100 * (st.LIMPEZA||0) / stTotal : 0;
+
+    var tt = DATA.terraplenagem.totals;
+    var ttTotal = (tt.CONCLUIDO||0) + (tt.PENDENTE||0);
+    var ttPct = ttTotal ? 100 * (tt.CONCLUIDO||0) / ttTotal : 0;
+
+    var estacas = sumLayer('estacas');
+    var mesas = sumLayer('mesas');
+    var modulos = sumLayer('modulos');
+
+    var cards = [
+      {label: 'Estacas', pct: estacas.pct, detail: estacas.done.toLocaleString('pt-BR') + ' de ' + estacas.total.toLocaleString('pt-BR') + ' concretadas'},
+      {label: 'Mesas', pct: mesas.pct, detail: mesas.done.toLocaleString('pt-BR') + ' de ' + mesas.total.toLocaleString('pt-BR') + ' instaladas'},
+      {label: 'Módulos', pct: modulos.pct, detail: modulos.done.toLocaleString('pt-BR') + ' de ' + modulos.total.toLocaleString('pt-BR') + ' instalados'},
+      {label: 'Supressão vegetal', pct: stPct, detail: fmtArea(st.LIMPEZA||0) + ' limpos de ' + fmtArea(stTotal)},
+      {label: 'Terraplenagem', pct: ttPct, detail: fmtArea(tt.CONCLUIDO||0) + ' de ' + fmtArea(ttTotal)},
+    ];
+
+    grid.innerHTML = cards.map(function(c){
+      var color = pctColor(c.pct);
+      return '<div class="summary-card" style="border-left-color:' + color + '">' +
+        '<span class="sm-label">' + c.label + '</span>' +
+        '<div class="sm-pct" style="color:' + color + '">' + fmtPct(c.pct) + '<small>%</small></div>' +
+        '<div class="sm-detail">' + c.detail + '</div>' +
+      '</div>';
+    }).join('');
+  })();
 
   (function(){
     var st = DATA.supressao.totals;
