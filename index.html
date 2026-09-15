@@ -2120,7 +2120,7 @@ sb.auth.getSession().then(function(res){
     keys.forEach(function(k){
       var m = monthMap[k];
       accP += m.previsto;
-      meses.push(MESES_PT[parseInt(k.slice(5,7),10)-1]);
+      meses.push(MESES_PT[parseInt(k.slice(5,7),10)-1] + '/' + k.slice(2,4));
       previsto.push(accP*100);
       if(m.minWeekStart <= corte){ accR += m.real; real.push(accR*100); }
       else { real.push(null); }
