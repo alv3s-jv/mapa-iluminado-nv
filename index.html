@@ -417,6 +417,13 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 #update-overlay{align-items:center;justify-content:center;padding:20px}
 #update-overlay::before,#update-overlay::after{display:none}
 #update-overlay{background:rgba(29,31,32,.45)}
+/* pl-update-overlay reusa .login-overlay (tela cheia, foto de fundo, encostado
+   à esquerda) sem nunca ganhar o mesmo tratamento de popup do #update-overlay
+   acima — por isso aparecia como se fosse uma página nova em vez de um popup
+   centralizado. Mesmo padrão aplicado aqui. */
+#pl-update-overlay{align-items:center;justify-content:center;padding:20px}
+#pl-update-overlay::before,#pl-update-overlay::after{display:none}
+#pl-update-overlay{background:rgba(29,31,32,.45)}
 .update-card{max-width:520px;height:auto;max-height:90vh;border:1px solid var(--border-strong);padding:28px 30px;justify-content:flex-start;gap:12px;animation:none}
 .update-card h1{font-size:28px}
 .update-close{position:absolute;top:10px;right:10px;background:none;border:none;font-size:24px;line-height:1;color:var(--ink-faint);cursor:pointer;padding:2px 8px;font-family:inherit}
@@ -731,7 +738,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h8"/></svg>
             <span>Fonte: <b>PPD Planejamento</b></span><span class="pl-sep">·</span><span><b id="pl-rev">Rev. 15</b></span><span class="pl-sep">·</span><span>atualizado em <b id="pl-updated-at">14/09/2026</b></span><span class="pl-sep">·</span><span>upload manual, não é tempo real</span>
           </div>
-          <button class="btn" id="pl-update-open-btn" type="button">
+          <button class="btn" id="pl-update-open-btn" type="button" hidden>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 9l6-6 6 6M4 21h16"/></svg>
             <span class="btn-text">Atualizar planejamento</span>
           </button>
@@ -2039,6 +2046,27 @@ sb.auth.getSession().then(function(res){
   // login) e ficava com sessão anônima para sempre, então toda chamada
   // (select e insert) ia como usuário anônimo, não importa quem logasse.
   function plSchema(){ return window.__mapaSb.schema('planejamento'); }
+
+  /* ---------- 2b. botão "Atualizar planejamento" só aparece pra conta Admin ----------
+     A RLS já bloqueia o insert pra quem não é admin, mas o botão ficava visível
+     pra qualquer usuário logado — quem não é admin via o popup, preenchia tudo
+     e só descobria que não tinha permissão depois de tentar enviar. Agora o
+     botão fica oculto (atributo `hidden`) até confirmarmos que o e-mail da
+     sessão atual é o do admin; reavalia a cada troca de sessão (login/logout). */
+  var PL_ADMIN_EMAIL = 'st.noronha@doisa.com';
+  var plUpdateBtn = document.getElementById('pl-update-open-btn');
+  async function plUpdateAdminVisibility(){
+    if(!plUpdateBtn) return;
+    var email = null;
+    try{
+      var res = await window.__mapaSb.auth.getSession();
+      var session = res.data && res.data.session;
+      email = session && session.user && session.user.email;
+    }catch(e){ email = null; }
+    plUpdateBtn.hidden = (email !== PL_ADMIN_EMAIL);
+  }
+  window.__mapaSb.auth.onAuthStateChange(function(){ plUpdateAdminVisibility(); });
+  plUpdateAdminVisibility();
 
   var AREA_META = {
     'SE NV': {sub:'Subestação Noronha Verde', grupo:'Subestações'},
