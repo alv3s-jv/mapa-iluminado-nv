@@ -547,6 +547,11 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-t-peso-val{font-family:var(--font-head);font-weight:600;font-size:15px;color:var(--primary);width:44px;text-align:right;font-variant-numeric:tabular-nums}
 .pl-table-foot{font-size:11px;color:var(--ink-faint);display:flex;justify-content:space-between;padding:6px 0 4px;flex-wrap:wrap;gap:8px}
 
+
+/* modal de upload da PPD — reaproveita a base visual de #update-card/#update-submit */
+#pl-submit{width:100%;min-height:48px;margin-top:8px;border:none;background:var(--accent);color:var(--accent-ink);font-family:var(--font-head);font-weight:600;font-size:17px;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:background-color .15s;border-radius:0}
+#pl-submit:hover{background:var(--accent-deep)}
+#pl-submit:disabled{opacity:.5;cursor:default}
 </style>
 
 <div class="login-overlay hidden" id="login-overlay">
@@ -585,6 +590,22 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 
     <button id="update-submit" type="button" disabled>Confirmar e enviar</button>
     <div class="update-log" id="update-log"></div>
+  </div>
+</div>
+<div class="login-overlay hidden" id="pl-update-overlay">
+  <div class="login-card update-card">
+    <button class="update-close" id="pl-update-close" type="button" title="Fechar">&times;</button>
+    <h1>Atualizar planejamento</h1>
+    <p>Selecione a planilha PPD (.xlsx) mais recente do setor de planejamento. O arquivo é lido no seu navegador — nada é enviado antes de você conferir o resumo e confirmar.</p>
+
+    <label for="pl-file-input">Planilha PPD (.xlsx)</label>
+    <input type="file" id="pl-file-input" accept=".xlsx">
+    <div class="update-file-status" id="pl-file-status">Nenhum arquivo selecionado.</div>
+
+    <div class="update-preview" id="pl-preview" hidden></div>
+
+    <button id="pl-submit" type="button" disabled>Confirmar e enviar</button>
+    <div class="update-log" id="pl-log"></div>
   </div>
 </div>
 <div class="app">
@@ -1986,12 +2007,14 @@ sb.auth.getSession().then(function(res){
 </script>
 
 <script>
-/* ================= ABA PLANEJAMENTO — lógica isolada do mapa ================= */
+/* ================= ABA PLANEJAMENTO — lógica isolada do mapa (v2: dados reais + upload) ================= */
 (function(){
-  // --- 1. troca de view no nível superior (Mapa iluminado / Planejamento) ---
+  /* ---------- 1. troca de view no nível superior (Mapa iluminado / Planejamento) ---------- */
   var topTabs = document.getElementById('top-tabs');
-  var mapaViews = [document.querySelector('.kpi-bar'), document.querySelector('.body-row')]; // views já existentes do mapa
+  var mapaViews = [document.querySelector('.kpi-bar'), document.querySelector('.body-row')];
   var plView = document.getElementById('planejamento-view');
+  var plBooted = false;
+
   topTabs.addEventListener('click', function(e){
     var btn = e.target.closest('.top-tab'); if(!btn) return;
     var view = btn.dataset.view;
@@ -2002,52 +2025,125 @@ sb.auth.getSession().then(function(res){
     if(!isMapa) renderPlanejamento();
   });
 
-  // --- 2. fonte de dados: PPD (upload manual). Troque MOCK_PPD pela leitura real (ex.: tabela Supabase 'ppd_snapshot'). ---
-  var MOCK_PPD = {
-    revisao: 'Rev. 15',
-    atualizadoEm: '14/09/2026',
-    curva: { // acumulado mensal, 0-100, previsto x real; troque pelos pontos reais do cronograma
-      meses: ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'],
-      previsto: [2,6,12,19,27,36,45,54,62.4,72,84,96],
-      real:     [2,5,10,16,23,31,39,47,55.1,null,null,null] // null = ainda não medido
-    },
-    areas: [
-      {nome:'SE NV', sub:'Subestação Noronha Verde', grupo:'Subestações', previsto:78.0, real:71.5},
-      {nome:'SE FN', sub:'Subestação Fernando de Noronha', grupo:'Subestações', previsto:64.0, real:66.2},
-      {nome:'BESS', sub:'Armazenamento de energia', grupo:'BESS', previsto:58.0, real:41.3},
-      {nome:'RMT', sub:'Rede de média tensão', grupo:'RMT', previsto:70.0, real:62.0},
-      {nome:'NV-01', sub:'Setor fotovoltaico', grupo:'NVs', previsto:92.0, real:90.4},
-      {nome:'NV-02', sub:'Setor fotovoltaico', grupo:'NVs', previsto:100, real:100},
-      {nome:'NV-03', sub:'Setor fotovoltaico', grupo:'NVs', previsto:55.0, real:38.9},
-      {nome:'NV-04', sub:'Setor fotovoltaico', grupo:'NVs', previsto:100, real:100},
-      {nome:'NV-05', sub:'Setor fotovoltaico', grupo:'NVs', previsto:100, real:100},
-      {nome:'NV-06', sub:'Setor fotovoltaico', grupo:'NVs', previsto:30.0, real:12.4}
-    ],
-    atividades: [ // atividades em atraso, ranqueadas por peso no PPD
-      {nome:'Montagem eletromecânica dos contêineres BESS', area:'BESS', status:'Atrasado', termino:'30/08/2026', peso:4.8},
-      {nome:'Cravação de estacas NV-06', area:'NV-06', status:'Atrasado', termino:'05/09/2026', peso:3.6},
-      {nome:'Instalação de mesas NV-03', area:'NV-03', status:'Atrasado', termino:'28/08/2026', peso:2.9},
-      {nome:'Lançamento de cabos MT — trecho RMT 02', area:'RMT', status:'Término em atraso', termino:'10/09/2026', peso:2.4},
-      {nome:'Montagem do transformador principal SE NV', area:'SE NV', status:'Término em atraso', termino:'12/09/2026', peso:2.1},
-      {nome:'Instalação de módulos NV-03', area:'NV-03', status:'Atrasado', termino:'15/09/2026', peso:1.7},
-      {nome:'Terraplenagem NV-06', area:'NV-06', status:'Atrasado', termino:'20/08/2026', peso:1.2},
-      {nome:'Malha de aterramento BESS', area:'BESS', status:'Término em atraso', termino:'01/09/2026', peso:0.6}
-    ]
+  /* ---------- 2. client Supabase próprio do módulo — schema isolado, sessão compartilhada
+     via sessionStorage com o app principal (mesma URL => mesma chave de storage do supabase-js) ---------- */
+  var PL_SUPABASE_URL = "https://yggzgjjwstmchcncgcvv.supabase.co";
+  var PL_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlnZ3pnamp3c3RtY2hjbmNnY3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5Mzc1MTIsImV4cCI6MjEwNDUxMzUxMn0.CJPpdPrlkXwrcps_U0Lf0gB0aWu3uyy6v3MqGrmhj3Y";
+  var sbPlanClient = window.supabase.createClient(PL_SUPABASE_URL, PL_SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, storage: window.sessionStorage }
+  });
+  function plSchema(){ return sbPlanClient.schema('planejamento'); }
+
+  var AREA_META = {
+    'SE NV': {sub:'Subestação Noronha Verde', grupo:'Subestações'},
+    'SE FN': {sub:'Subestação Fernando de Noronha', grupo:'Subestações'},
+    'BESS':  {sub:'Armazenamento de energia', grupo:'BESS'},
+    'RMT':   {sub:'Rede de média tensão', grupo:'RMT'},
+    'NV-01': {sub:'Setor fotovoltaico', grupo:'NVs'},
+    'NV-02': {sub:'Setor fotovoltaico', grupo:'NVs'},
+    'NV-03': {sub:'Setor fotovoltaico', grupo:'NVs'},
+    'NV-04': {sub:'Setor fotovoltaico', grupo:'NVs'},
+    'NV-05': {sub:'Setor fotovoltaico', grupo:'NVs'},
+    'NV-06': {sub:'Setor fotovoltaico', grupo:'NVs'}
   };
+  var AREA_ORDER = ['SE NV','SE FN','BESS','RMT','NV-01','NV-02','NV-03','NV-04','NV-05','NV-06'];
+  var MESES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
-  var plState = { filtro: 'Todas', ordenar: 'peso', loaded: false };
+  var plState = { filtro: 'Todas', ordenar: 'peso', loaded: false, snapData: null, derived: null };
 
-  function fmtPct(n){ return n.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
+  function fmtPct(n){ return (n==null?0:n).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
+  function fmtDateBR(iso){ if(!iso) return '–'; var p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
   function colorFor(delta){ return delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)'; }
   function statusClassFor(delta){ return delta >= -2 ? 'ok' : delta >= -8 ? 'warn' : ''; }
-  function parseDateBR(s){ var p = s.split('/'); return new Date(+p[2], +p[1]-1, +p[0]); }
 
+  /* ---------- 3. leitura dos dados reais (snapshot atual) ---------- */
+  async function fetchCurrentSnapshot(){
+    var { data: snap, error: e1 } = await plSchema().from('ppd_snapshot').select('*').eq('is_current', true).maybeSingle();
+    if(e1){ console.error('[planejamento] erro ao buscar snapshot', e1); return { error: e1 }; }
+    if(!snap) return { snap: null };
+    var [curvaRes, ativRes] = await Promise.all([
+      plSchema().from('ppd_curva_area').select('*').eq('snapshot_id', snap.id),
+      plSchema().from('ppd_atividades').select('*').eq('snapshot_id', snap.id)
+    ]);
+    if(curvaRes.error || ativRes.error){ console.error('[planejamento] erro ao buscar dados', curvaRes.error, ativRes.error); return { error: curvaRes.error || ativRes.error }; }
+    return { snap: snap, curva: curvaRes.data || [], atividades: ativRes.data || [] };
+  }
+
+  /* ---------- 4. cálculos derivados (curva total mensal, % por área, atrasos) ---------- */
+  function computeCurvaTotal(curva, corte){
+    var monthMap = {};
+    curva.forEach(function(r){
+      if(!r.semana_inicio) return;
+      var key = r.semana_inicio.slice(0,7);
+      if(!monthMap[key]) monthMap[key] = {previsto:0, real:0, minWeekStart:'9999-99'};
+      monthMap[key].previsto += Number(r.previsto_sem)||0;
+      monthMap[key].real += Number(r.real_sem)||0;
+      if(r.semana_inicio < monthMap[key].minWeekStart) monthMap[key].minWeekStart = r.semana_inicio;
+    });
+    var keys = Object.keys(monthMap).sort();
+    var meses = [], previsto = [], real = [];
+    var accP = 0, accR = 0;
+    keys.forEach(function(k){
+      var m = monthMap[k];
+      accP += m.previsto;
+      meses.push(MESES_PT[parseInt(k.slice(5,7),10)-1]);
+      previsto.push(accP*100);
+      if(m.minWeekStart <= corte){ accR += m.real; real.push(accR*100); }
+      else { real.push(null); }
+    });
+    return { meses: meses, previsto: previsto, real: real };
+  }
+
+  function computeAreas(curva, corte){
+    var byArea = {};
+    curva.forEach(function(r){
+      var a = byArea[r.local] = byArea[r.local] || { prevFull:0, prevToCorte:0, realToCorte:0 };
+      a.prevFull += Number(r.previsto_sem)||0;
+      if(r.semana_inicio && r.semana_inicio <= corte){
+        a.prevToCorte += Number(r.previsto_sem)||0;
+        a.realToCorte += Number(r.real_sem)||0;
+      }
+    });
+    return AREA_ORDER.filter(function(a){ return byArea[a]; }).map(function(area){
+      var a = byArea[area];
+      var meta = AREA_META[area] || {sub:'', grupo:'Outros'};
+      var previstoPct = a.prevFull > 0 ? (a.prevToCorte/a.prevFull*100) : 0;
+      var realPct = a.prevFull > 0 ? (a.realToCorte/a.prevFull*100) : 0;
+      return { nome: area, sub: meta.sub, grupo: meta.grupo, previsto: previstoPct, real: realPct };
+    });
+  }
+
+  function computeLate(atividades, corte){
+    var corteDate = new Date(corte + 'T00:00:00');
+    return atividades
+      .filter(function(t){ return t.status === 'ATRASADO' || t.status === 'TÉRMINO EM ATRASO'; })
+      .map(function(t){
+        var due = t.data_fim_prevista ? new Date(t.data_fim_prevista + 'T00:00:00') : null;
+        var dias = due ? Math.max(0, Math.round((corteDate - due) / 864e5)) : 0;
+        return {
+          nome: t.nome_tarefa, area: t.local, status: t.status,
+          termino: fmtDateBR(t.data_fim_prevista), dueRaw: t.data_fim_prevista,
+          dias: dias, peso: (Number(t.peso_unitario)||0) * 100
+        };
+      });
+  }
+
+  function computeDerived(snapData, corte){
+    return {
+      curvaTotal: computeCurvaTotal(snapData.curva, corte),
+      areas: computeAreas(snapData.curva, corte),
+      late: computeLate(snapData.atividades, corte)
+    };
+  }
+
+  /* ---------- 5. render ---------- */
   function renderCurva(data){
     var svg = document.getElementById('pl-scurve');
     var W = 820, H = 260, padL = 40, padR = 40, top = 14, bottom = 230;
     var n = data.meses.length;
+    if(n < 2){ svg.innerHTML = ''; return -1; }
     var x = function(i){ return padL + i * (W - padL - padR) / (n - 1); };
-    var y = function(v){ return bottom - (v/100) * (bottom - top); };
+    var y = function(v){ return bottom - (Math.max(0,Math.min(100,v))/100) * (bottom - top); };
     var lastReal = -1;
     data.real.forEach(function(v,i){ if(v != null) lastReal = i; });
     function pathFor(arr){
@@ -2056,7 +2152,6 @@ sb.auth.getSession().then(function(res){
     }
     var previstoPath = pathFor(data.previsto);
     var realPath = pathFor(data.real);
-    var todayX = x(lastReal);
     var gridY = [top, top+(bottom-top)*0.25, top+(bottom-top)*0.5, top+(bottom-top)*0.75, bottom];
     var gridLabels = ['100%','75%','50%','25%','0%'];
     var svgParts = [];
@@ -2067,13 +2162,13 @@ sb.auth.getSession().then(function(res){
       svgParts.push('<path d="'+realPath+' L '+x(lastReal).toFixed(1)+' '+bottom+' L '+padL+' '+bottom+' Z" fill="var(--primary)" fill-opacity=".08"/>');
     }
     svgParts.push('<path d="'+previstoPath+'" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="5 4"/>');
-    svgParts.push('<path d="'+realPath+'" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>');
+    if(realPath) svgParts.push('<path d="'+realPath+'" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>');
     if(lastReal >= 0){
+      var todayX = x(lastReal);
       svgParts.push('<line x1="'+todayX.toFixed(1)+'" y1="'+top+'" x2="'+todayX.toFixed(1)+'" y2="'+bottom+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>');
-      svgParts.push('<text x="'+(todayX+6).toFixed(1)+'" y="'+top+'" fill="var(--accent)" font-size="11" font-weight="500">'+ MOCK_PPD.atualizadoEm.slice(0,5) +'</text>');
       svgParts.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.previsto[lastReal]).toFixed(1)+'" r="4" fill="var(--surface)" stroke="var(--ink-faint)" stroke-width="2"/>');
       svgParts.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.real[lastReal]).toFixed(1)+'" r="4.5" fill="var(--primary)"/>');
-      svgParts.push('<g fill="var(--ink)" font-size="11"><text x="'+(todayX+12).toFixed(1)+'" y="'+(y(data.previsto[lastReal])-3).toFixed(1)+'">'+fmtPct(data.previsto[lastReal])+'% previsto</text><text x="'+(todayX+12).toFixed(1)+'" y="'+(y(data.real[lastReal])+25).toFixed(1)+'" font-weight="700" fill="var(--primary)">'+fmtPct(data.real[lastReal])+'% real</text></g>');
+      svgParts.push('<g fill="var(--ink)" font-size="11"><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.previsto[lastReal])-6).toFixed(1)+'">'+fmtPct(data.previsto[lastReal])+'% previsto</text><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.real[lastReal])+18).toFixed(1)+'" font-weight="700" fill="var(--primary)">'+fmtPct(data.real[lastReal])+'% real</text></g>');
     }
     svg.innerHTML = svgParts.join('');
     return lastReal;
@@ -2085,93 +2180,371 @@ sb.auth.getSession().then(function(res){
     el.innerHTML = groups.map(function(g){ return '<button type="button" data-g="'+g+'" class="'+(plState.filtro===g?'active':'')+'">'+g+'</button>'; }).join('');
   }
 
-  function renderAreas(){
+  function renderAreas(areas){
     var grid = document.getElementById('pl-area-grid');
-    var list = MOCK_PPD.areas.filter(function(a){ return plState.filtro === 'Todas' || a.grupo === plState.filtro; });
+    var list = areas.filter(function(a){ return plState.filtro === 'Todas' || a.grupo === plState.filtro; });
+    if(list.length === 0){ grid.innerHTML = '<p style="color:var(--ink-faint);font-size:13px">Sem áreas nesse filtro.</p>'; return; }
     grid.innerHTML = list.map(function(a){
       var delta = a.real - a.previsto;
       var color = colorFor(delta);
-      var deltaLabel = delta === 0 ? '0,0%' : (delta > 0 ? '+' : '−') + fmtPct(Math.abs(delta)) + '%';
+      var deltaLabel = Math.abs(delta) < 0.05 ? '0,0%' : (delta > 0 ? '+' : '−') + fmtPct(Math.abs(delta)) + '%';
       return '<div class="pl-area-card">' +
         '<div class="pl-area-card-head"><div class="pl-area-name"><b>'+a.nome+'</b><span>'+a.sub+'</span></div>' +
         '<span class="pl-area-delta" style="background:'+color+'">'+deltaLabel+'</span></div>' +
-        '<div class="pl-area-bar"><div class="pl-area-bar-fill" style="background:'+color+';width:'+a.real+'%"></div>' +
-        '<div class="pl-area-bar-mark" style="left:calc('+a.previsto+'% - 1px)"></div></div>' +
+        '<div class="pl-area-bar"><div class="pl-area-bar-fill" style="background:'+color+';width:'+Math.max(0,Math.min(100,a.real))+'%"></div>' +
+        '<div class="pl-area-bar-mark" style="left:calc('+Math.max(0,Math.min(100,a.previsto))+'% - 1px)"></div></div>' +
         '<div class="pl-area-nums"><div><span>Previsto</span><b>'+fmtPct(a.previsto)+'<small>%</small></b></div>' +
         '<div class="r"><span>Real</span><b>'+fmtPct(a.real)+'<small>%</small></b></div></div>' +
       '</div>';
     }).join('');
   }
 
-  function renderLate(){
-    var rows = MOCK_PPD.atividades.map(function(r){ return Object.assign({}, r, {dueDate: parseDateBR(r.termino)}); });
-    var ref = parseDateBR(MOCK_PPD.atualizadoEm);
-    rows.forEach(function(r){ r.dias = Math.max(0, Math.round((ref - r.dueDate) / 864e5)); });
-    rows.sort(function(a,b){ return plState.ordenar === 'peso' ? b.peso - a.peso : a.dueDate - b.dueDate; });
-    var maxPeso = Math.max.apply(null, rows.map(function(r){ return r.peso; }));
+  function renderLate(late){
+    var rows = late.slice();
+    rows.sort(function(a,b){ return plState.ordenar === 'peso' ? b.peso - a.peso : (a.dueRaw||'9999').localeCompare(b.dueRaw||'9999'); });
+    var maxPeso = Math.max.apply(null, rows.map(function(r){ return r.peso; }).concat([0.0001]));
     var body = document.getElementById('pl-late-body');
-    body.innerHTML = rows.map(function(r,i){
-      var statusColor = r.status === 'Atrasado' ? 'var(--pl-late)' : 'var(--pl-warn)';
-      return '<tr>' +
-        '<td class="pl-t-rank">'+String(i+1).padStart(2,'0')+'</td>' +
-        '<td class="pl-t-name">'+r.nome+'</td>' +
-        '<td class="pl-t-area">'+r.area+'</td>' +
-        '<td><span class="pl-t-status" style="color:'+statusColor+'"><i style="background:'+statusColor+'"></i>'+r.status+'</span></td>' +
-        '<td class="pl-t-due">'+r.termino+'</td>' +
-        '<td class="pl-t-days">'+r.dias+'</td>' +
-        '<td><div class="pl-t-peso"><div class="pl-t-peso-bar"><i style="width:'+(r.peso/maxPeso*100)+'%"></i></div>' +
-        '<span class="pl-t-peso-val">'+fmtPct(r.peso)+'%</span></div></td>' +
-      '</tr>';
-    }).join('');
+    if(rows.length === 0){
+      body.innerHTML = '<tr><td colspan="7" style="color:var(--ink-faint);padding:12px 0">Nenhuma atividade em atraso na revisão atual.</td></tr>';
+    } else {
+      body.innerHTML = rows.map(function(r,i){
+        var statusColor = r.status === 'ATRASADO' ? 'var(--pl-late)' : 'var(--pl-warn)';
+        return '<tr>' +
+          '<td class="pl-t-rank">'+String(i+1).padStart(2,'0')+'</td>' +
+          '<td class="pl-t-name">'+r.nome+'</td>' +
+          '<td class="pl-t-area">'+r.area+'</td>' +
+          '<td><span class="pl-t-status" style="color:'+statusColor+'"><i style="background:'+statusColor+'"></i>'+r.status+'</span></td>' +
+          '<td class="pl-t-due">'+r.termino+'</td>' +
+          '<td class="pl-t-days">'+r.dias+'</td>' +
+          '<td><div class="pl-t-peso"><div class="pl-t-peso-bar"><i style="width:'+(r.peso/maxPeso*100)+'%"></i></div>' +
+          '<span class="pl-t-peso-val">'+fmtPct(r.peso)+'%</span></div></td>' +
+        '</tr>';
+      }).join('');
+    }
     var lateWeight = rows.reduce(function(t,r){ return t + r.peso; }, 0);
-    document.getElementById('pl-late-summary').textContent = rows.length + ' atividades · ' + fmtPct(lateWeight) + '% do peso do projeto';
+    document.getElementById('pl-late-summary').textContent = rows.length + ' atividade' + (rows.length===1?'':'s') + ' · ' + fmtPct(lateWeight) + '% do peso do projeto';
   }
 
-  function renderSummary(lastReal){
-    var prev = MOCK_PPD.curva.previsto[lastReal], real = MOCK_PPD.curva.real[lastReal];
+  function renderSummary(curvaTotal, lastReal){
+    if(lastReal < 0){
+      document.getElementById('pl-prev-pct').innerHTML = '–<small>%</small>';
+      document.getElementById('pl-real-pct').innerHTML = '–<small>%</small>';
+      document.getElementById('pl-delta-pct').innerHTML = '–<small>%</small>';
+      document.getElementById('pl-status-tag').textContent = '–';
+      return;
+    }
+    var prev = curvaTotal.previsto[lastReal], real = curvaTotal.real[lastReal];
     var delta = real - prev;
     document.getElementById('pl-prev-pct').innerHTML = fmtPct(prev) + '<small>%</small>';
     document.getElementById('pl-real-pct').innerHTML = fmtPct(real) + '<small>%</small>';
-    document.getElementById('pl-real-note').textContent = 'medido na ' + MOCK_PPD.revisao + ' · ' + MOCK_PPD.atualizadoEm;
     document.getElementById('pl-delta-pct').innerHTML = (delta>0?'+':delta<0?'−':'') + fmtPct(Math.abs(delta)) + '<small>%</small>';
     var card = document.getElementById('pl-delta-card'), tag = document.getElementById('pl-status-tag');
     var cls = statusClassFor(delta);
-    card.style.borderColor = delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
-    card.querySelector('.pl-big').style.color = delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
+    var col = delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
+    card.style.borderColor = col;
+    card.querySelector('.pl-big').style.color = col;
     tag.className = 'pl-status-tag ' + cls;
     tag.textContent = delta >= -2 ? 'No prazo' : delta >= -8 ? 'Atenção' : 'Atrasado';
   }
 
-  function renderPlanejamento(){
-    document.getElementById('pl-rev').textContent = MOCK_PPD.revisao;
-    document.getElementById('pl-rev-2').textContent = MOCK_PPD.revisao;
-    document.getElementById('pl-updated-at').textContent = MOCK_PPD.atualizadoEm;
-    var lastReal = renderCurva(MOCK_PPD.curva);
-    renderSummary(lastReal);
+  function renderEmptyState(msg){
+    var scroll = document.querySelector('.pl-scroll');
+    if(!scroll) return;
+    var existing = document.getElementById('pl-empty-state');
+    if(existing) existing.remove();
+    var div = document.createElement('div');
+    div.id = 'pl-empty-state';
+    div.style.cssText = 'padding:48px 16px;text-align:center;color:var(--ink-faint);font-size:14px';
+    div.innerHTML = msg;
+    scroll.insertBefore(div, scroll.firstChild.nextSibling);
+    ['.pl-top-grid', '.pl-areas-block', '.pl-late-block'].forEach(function(sel){
+      var el = document.querySelector(sel);
+      if(el) el.style.display = 'none';
+    });
+  }
+
+  function clearEmptyState(){
+    var existing = document.getElementById('pl-empty-state');
+    if(existing) existing.remove();
+    ['.pl-top-grid', '.pl-areas-block', '.pl-late-block'].forEach(function(sel){
+      var el = document.querySelector(sel);
+      if(el) el.style.display = '';
+    });
+  }
+
+  async function renderPlanejamento(){
+    var result = await fetchCurrentSnapshot();
+    if(result.error){
+      renderEmptyState('Não foi possível carregar os dados de planejamento agora. Tente novamente em instantes.');
+      return;
+    }
+    if(!result.snap){
+      document.getElementById('pl-rev').textContent = '–';
+      document.getElementById('pl-rev-2').textContent = '–';
+      document.getElementById('pl-updated-at').textContent = '–';
+      renderEmptyState('Nenhuma revisão do PPD foi importada ainda. Clique em "Atualizar planejamento" para enviar a primeira planilha.');
+      plState.loaded = true;
+      return;
+    }
+    clearEmptyState();
+    plState.snapData = result;
+    var corte = result.snap.data_corte;
+    var derived = computeDerived(result, corte);
+    plState.derived = derived;
+
+    document.getElementById('pl-rev').textContent = result.snap.revisao;
+    document.getElementById('pl-rev-2').textContent = result.snap.revisao;
+    document.getElementById('pl-updated-at').textContent = fmtDateBR(corte);
+
+    var lastReal = renderCurva(derived.curvaTotal);
+    renderSummary(derived.curvaTotal, lastReal);
     renderFilters();
-    renderAreas();
-    renderLate();
+    renderAreas(derived.areas);
+    renderLate(derived.late);
     plState.loaded = true;
   }
 
   document.getElementById('pl-area-filters').addEventListener('click', function(e){
-    var btn = e.target.closest('button'); if(!btn) return;
-    plState.filtro = btn.dataset.g; renderFilters(); renderAreas();
+    var btn = e.target.closest('button'); if(!btn || !plState.derived) return;
+    plState.filtro = btn.dataset.g; renderFilters(); renderAreas(plState.derived.areas);
   });
   document.getElementById('pl-sort-toggle').addEventListener('click', function(e){
-    var btn = e.target.closest('button'); if(!btn) return;
+    var btn = e.target.closest('button'); if(!btn || !plState.derived) return;
     plState.ordenar = btn.dataset.sort;
     document.getElementById('pl-sort-toggle').querySelectorAll('button').forEach(function(b){ b.classList.toggle('active', b===btn); });
-    renderLate();
+    renderLate(plState.derived.late);
   });
 
-  // botão "Atualizar planejamento": reaproveite o padrão do modal de upload já existente (#update-overlay),
-  // trocando o conteúdo para aceitar a planilha PPD em vez dos .gpkg do mapa.
-  document.getElementById('pl-update-open-btn').addEventListener('click', function(){
-    // TODO: abrir um modal próprio (mesmo padrão de .login-overlay/.update-card) para upload da nova revisão do PPD
-    alert('Abrir modal de upload da nova revisão do PPD (reaproveitar padrão visual de #update-overlay).');
-  });
+  /* ================= 6. upload / importação da planilha PPD ================= */
+  var AREA_ORDER_PARSE = ['NV-01', 'NV-02', 'NV-03', 'NV-04', 'NV-05', 'NV-06', 'BESS', 'RMT', 'SE FN', 'SE NV'];
+  var BD_PREV_ROWS = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+  var BD_REAL_ROWS = [34, 35, 36, 37, 38, 39, 40, 41, 42, 43];
+  var BD_PREV_TOTAL_ROW = 32, BD_REAL_TOTAL_ROW = 45;
+  var BD_WEEK_COL_START = 5, BD_ROW_SEMANA_NUM = 8, BD_ROW_SEMANA_LABEL = 9, BD_ROW_SEMANA_INICIO = 10, BD_ROW_SEMANA_FIM = 11, BD_COL_LOCAL = 4;
+  var QT_HEADER_ROW = 10, QT_DATA_START_ROW = 11;
+  var QT_COL = { local:1, servico:2, id:3, nome:4, iniPrev:5, termPrev:6, iniReal:9, termReal:10, status:12, peso:19, avPrev:21, avReal:22 };
+
+  function plCellVal(ws, row, col){
+    var addr = XLSX.utils.encode_cell({ r: row - 1, c: col - 1 });
+    var cell = ws[addr];
+    return cell ? cell.v : undefined;
+  }
+  function plExcelDateToISO(v){
+    if(v == null) return null;
+    if(v instanceof Date) return v.toISOString().slice(0,10);
+    if(typeof v === 'number' && XLSX.SSF){
+      var d = XLSX.SSF.parse_date_code(v);
+      if(d){ return new Date(Date.UTC(d.y, d.m-1, d.d)).toISOString().slice(0,10); }
+    }
+    return null;
+  }
+  function plAssertLabel(actual, expected, where){
+    var norm = function(s){ return s == null ? '' : String(s).trim(); };
+    if(norm(actual) !== expected){
+      throw new Error('Estrutura da planilha diferente do esperado em ' + where + ': esperado "' + expected + '", encontrado "' + actual + '". Importação cancelada — confira se é o arquivo certo ou avise o time de planejamento se o layout da PPD mudou.');
+    }
+  }
+  function plParseRevisaoFromFilename(filename){
+    var m = /rev[.\s_-]*(\d+)/i.exec(filename || '');
+    return m ? ('Rev. ' + m[1]) : null;
+  }
+
+  function plParseCurva(wb, warnings){
+    var ws = wb.Sheets['BD.Dados'];
+    if(!ws) throw new Error('Aba "BD.Dados" não encontrada no arquivo.');
+    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_NUM, BD_COL_LOCAL), 'Semana', 'BD.Dados!D8');
+    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_INICIO, BD_COL_LOCAL), 'Início', 'BD.Dados!D10');
+    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_FIM, BD_COL_LOCAL), 'Término', 'BD.Dados!D11');
+    plAssertLabel(plCellVal(ws, BD_PREV_TOTAL_ROW, BD_COL_LOCAL), 'UFV Noronha Verde', 'BD.Dados!D' + BD_PREV_TOTAL_ROW);
+    plAssertLabel(plCellVal(ws, BD_REAL_TOTAL_ROW, BD_COL_LOCAL), 'UFV Noronha Verde', 'BD.Dados!D' + BD_REAL_TOTAL_ROW);
+    AREA_ORDER_PARSE.forEach(function(area, i){
+      plAssertLabel(plCellVal(ws, BD_PREV_ROWS[i], BD_COL_LOCAL), area, 'BD.Dados!D' + BD_PREV_ROWS[i] + ' (Previsto)');
+      plAssertLabel(plCellVal(ws, BD_REAL_ROWS[i], BD_COL_LOCAL), area, 'BD.Dados!D' + BD_REAL_ROWS[i] + ' (Real)');
+    });
+
+    var lastCol = BD_WEEK_COL_START - 1, emptyStreak = 0;
+    for(var c = BD_WEEK_COL_START; c <= BD_WEEK_COL_START + 200; c++){
+      var lbl = plCellVal(ws, BD_ROW_SEMANA_LABEL, c);
+      if(lbl == null || lbl === ''){ emptyStreak++; if(emptyStreak >= 2) break; }
+      else { emptyStreak = 0; lastCol = c; }
+    }
+    if(lastCol < BD_WEEK_COL_START) throw new Error('Nenhuma coluna de semana encontrada em BD.Dados.');
+
+    var curva = [];
+    var sumPrev = 0, sumReal = 0;
+    for(var col = BD_WEEK_COL_START; col <= lastCol; col++){
+      var label = plCellVal(ws, BD_ROW_SEMANA_LABEL, col);
+      var semanaNum = plCellVal(ws, BD_ROW_SEMANA_NUM, col);
+      var semanaInicio = plExcelDateToISO(plCellVal(ws, BD_ROW_SEMANA_INICIO, col));
+      var semanaFim = plExcelDateToISO(plCellVal(ws, BD_ROW_SEMANA_FIM, col));
+      var m = /-(\d{4})$/.exec(String(label || ''));
+      var ano = m ? parseInt(m[1],10) : (semanaInicio ? parseInt(semanaInicio.slice(0,4),10) : null);
+      if(!ano || semanaNum == null) continue;
+      AREA_ORDER_PARSE.forEach(function(area, i){
+        var prev = plCellVal(ws, BD_PREV_ROWS[i], col) || 0;
+        var real = plCellVal(ws, BD_REAL_ROWS[i], col);
+        curva.push({ local: area, ano: ano, semana_num: semanaNum, semana_inicio: semanaInicio, semana_fim: semanaFim, previsto_sem: prev, real_sem: real == null ? null : real });
+        sumPrev += prev; sumReal += (real || 0);
+      });
+    }
+    var sumRow32 = 0, sumRow45 = 0;
+    for(var c2 = BD_WEEK_COL_START; c2 <= lastCol; c2++){ sumRow32 += plCellVal(ws, BD_PREV_TOTAL_ROW, c2) || 0; sumRow45 += plCellVal(ws, BD_REAL_TOTAL_ROW, c2) || 0; }
+    if(Math.abs(sumRow32 - sumPrev) > 0.001 || Math.abs(sumRow45 - sumReal) > 0.001){
+      warnings.push('Soma das áreas diverge do total oficial da aba BD.Dados — confira antes de confirmar.');
+    }
+    return curva;
+  }
+
+  function plParseAtividades(wb, warnings){
+    var ws = wb.Sheets['PPD - Real - Quant.'];
+    if(!ws) throw new Error('Aba "PPD - Real - Quant." não encontrada no arquivo.');
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.local), 'LOCAL', 'PPD - Real - Quant.!A' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.nome), 'Nome da Tarefa', 'PPD - Real - Quant.!D' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.status), 'Status', 'PPD - Real - Quant.!L' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.peso), '% Peso Unitário', 'PPD - Real - Quant.!S' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.avPrev), '% Avanço Previsto', 'PPD - Real - Quant.!U' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.avReal), '% Avanço Real', 'PPD - Real - Quant.!V' + QT_HEADER_ROW);
+
+    var range = XLSX.utils.decode_range(ws['!ref']);
+    var maxRow = range.e.r + 1;
+    var atividades = [], pesoSum = 0;
+    for(var r = QT_DATA_START_ROW; r <= maxRow; r++){
+      var local = plCellVal(ws, r, QT_COL.local);
+      if(local == null || local === '') continue;
+      var peso = plCellVal(ws, r, QT_COL.peso) || 0;
+      pesoSum += peso;
+      atividades.push({
+        local: String(local).trim(),
+        servico: plCellVal(ws, r, QT_COL.servico) || null,
+        nome_tarefa: String(plCellVal(ws, r, QT_COL.nome) || '').trim(),
+        status: plCellVal(ws, r, QT_COL.status) || null,
+        data_inicio_prevista: plExcelDateToISO(plCellVal(ws, r, QT_COL.iniPrev)),
+        data_fim_prevista: plExcelDateToISO(plCellVal(ws, r, QT_COL.termPrev)),
+        data_inicio_real: plExcelDateToISO(plCellVal(ws, r, QT_COL.iniReal)),
+        data_fim_real: plExcelDateToISO(plCellVal(ws, r, QT_COL.termReal)),
+        peso_unitario: peso,
+        avanco_previsto: plCellVal(ws, r, QT_COL.avPrev),
+        avanco_real: plCellVal(ws, r, QT_COL.avReal)
+      });
+    }
+    if(pesoSum < 0.9 || pesoSum > 1.1) warnings.push('Soma de "% Peso Unitário" das tarefas = ' + (pesoSum*100).toFixed(1) + '% (esperado ~100%).');
+    var corte = plExcelDateToISO(plCellVal(ws, 8, 6));
+    if(!corte) throw new Error('Data de corte (PPD - Real - Quant.!F8) não encontrada ou inválida.');
+    return { atividades: atividades, dataCorte: corte };
+  }
+
+  function plParsePPD(wb, filename){
+    var warnings = [];
+    var curva = plParseCurva(wb, warnings);
+    var r = plParseAtividades(wb, warnings);
+    var revisao = plParseRevisaoFromFilename(filename) || 'Revisão não identificada';
+    return { revisao: revisao, data_corte: r.dataCorte, arquivo_origem: filename || null, curva: curva, atividades: r.atividades, warnings: warnings };
+  }
+
+  /* ---------- modal de upload ---------- */
+  var xlsxReady = null;
+  function ensureXlsx(){
+    if(typeof XLSX !== 'undefined') return Promise.resolve();
+    if(xlsxReady) return xlsxReady;
+    xlsxReady = new Promise(function(resolve, reject){
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('Falha ao carregar biblioteca de leitura de planilha (xlsx.js). Confira sua conexão e tente de novo.')); };
+      document.head.appendChild(s);
+    });
+    return xlsxReady;
+  }
+
+  (function setupUploadModal(){
+    var openBtn = document.getElementById('pl-update-open-btn');
+    if(!openBtn) return;
+    var overlay = document.getElementById('pl-update-overlay');
+    var closeBtn = document.getElementById('pl-update-close');
+    var fileInput = document.getElementById('pl-file-input');
+    var statusEl = document.getElementById('pl-file-status');
+    var preview = document.getElementById('pl-preview');
+    var submitBtn = document.getElementById('pl-submit');
+    var logEl = document.getElementById('pl-log');
+    var parsedResult = null;
+
+    function reset(){
+      fileInput.value = '';
+      statusEl.textContent = 'Nenhum arquivo selecionado.';
+      preview.hidden = true; preview.innerHTML = '';
+      logEl.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Confirmar e enviar';
+      parsedResult = null;
+    }
+
+    openBtn.addEventListener('click', function(){ reset(); overlay.classList.remove('hidden'); });
+    closeBtn.addEventListener('click', function(){ overlay.classList.add('hidden'); });
+
+    fileInput.addEventListener('change', async function(){
+      var file = fileInput.files[0];
+      if(!file) return;
+      statusEl.textContent = 'Lendo "' + file.name + '"…';
+      preview.hidden = true; submitBtn.disabled = true; logEl.textContent = '';
+      try{
+        await ensureXlsx();
+        var buf = await file.arrayBuffer();
+        var wb = XLSX.read(buf, { type: 'array', cellDates: false });
+        parsedResult = plParsePPD(wb, file.name);
+        statusEl.textContent = '"' + file.name + '" lido com sucesso.';
+        var warnHtml = parsedResult.warnings.length
+          ? '<p style="color:var(--pl-warn);margin-top:6px">⚠ ' + parsedResult.warnings.join('<br>⚠ ') + '</p>'
+          : '';
+        preview.hidden = false;
+        preview.innerHTML =
+          '<p><b>Revisão:</b> ' + parsedResult.revisao + '</p>' +
+          '<p><b>Data de corte:</b> ' + fmtDateBR(parsedResult.data_corte) + '</p>' +
+          '<p><b>Pontos da curva S:</b> ' + parsedResult.curva.length + ' (10 áreas × semanas)</p>' +
+          '<p><b>Atividades:</b> ' + parsedResult.atividades.length + '</p>' +
+          warnHtml;
+        submitBtn.disabled = false;
+      } catch(err){
+        console.error('[planejamento] erro ao ler planilha', err);
+        statusEl.textContent = 'Erro ao ler o arquivo.';
+        logEl.textContent = err.message || String(err);
+        parsedResult = null;
+      }
+    });
+
+    submitBtn.addEventListener('click', async function(){
+      if(!parsedResult) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando…';
+      logEl.textContent = '';
+      try{
+        var { data, error } = await plSchema().rpc('import_ppd_snapshot', {
+          p_revisao: parsedResult.revisao,
+          p_data_corte: parsedResult.data_corte,
+          p_arquivo: parsedResult.arquivo_origem,
+          p_curva: parsedResult.curva,
+          p_atividades: parsedResult.atividades
+        });
+        if(error) throw error;
+        logEl.textContent = 'Importado com sucesso (snapshot #' + data + ').';
+        submitBtn.textContent = 'Enviado ✓';
+        setTimeout(function(){
+          overlay.classList.add('hidden');
+          renderPlanejamento();
+        }, 900);
+      } catch(err){
+        console.error('[planejamento] erro ao importar', err);
+        var msg = (err && err.message) || String(err);
+        if(/permission denied|row-level security|RLS/i.test(msg)){
+          msg = 'Sem permissão para enviar. Apenas a conta Admin do planejamento pode importar uma nova revisão do PPD.';
+        }
+        logEl.textContent = 'Falha ao enviar: ' + msg;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Tentar novamente';
+      }
+    });
+  })();
 })();
+
 </script>
 
 </body>
