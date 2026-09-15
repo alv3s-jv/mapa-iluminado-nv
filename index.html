@@ -486,6 +486,9 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-lg-solid{height:3px;background:var(--primary)}
 .pl-lg-vline{width:0!important;height:12px;border-left:1px dashed var(--accent)}
 .pl-curve-svg{width:100%;height:auto;display:block;font-family:var(--font-body)}
+.pl-curve-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.pl-curve-scroll::-webkit-scrollbar{height:6px}
+.pl-curve-scroll::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:3px}
 .pl-curve-foot{font-size:11px;color:var(--ink-faint);display:flex;justify-content:space-between;border-top:1px solid var(--surface-2);padding-top:8px}
 .pl-tag{font-family:var(--font-head);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--border);padding:1px 6px}
 
@@ -755,8 +758,8 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
               <span><i class="pl-lg pl-lg-vline"></i>Última atualização</span>
             </div>
           </div>
-          <svg id="pl-scurve" viewBox="0 0 820 260" class="pl-curve-svg"></svg>
-          <div class="pl-curve-foot"><span>Acumulado mensal · linha de base <span id="pl-rev-2">Rev. 15</span></span><span class="pl-tag">dados ilustrativos</span></div>
+          <div class="pl-curve-scroll"><svg id="pl-scurve" viewBox="0 0 820 260" class="pl-curve-svg"></svg></div>
+          <div class="pl-curve-foot"><span>Acumulado semanal · linha de base <span id="pl-rev-2">Rev. 15</span></span><span class="pl-tag">dados ilustrativos</span></div>
         </div>
 
         <div class="pl-summary-col">
@@ -2082,6 +2085,7 @@ sb.auth.getSession().then(function(res){
   };
   var AREA_ORDER = ['SE NV','SE FN','BESS','RMT','NV-01','NV-02','NV-03','NV-04','NV-05','NV-06'];
   var MESES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  var MESES_PT_CAP = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
   var plState = { filtro: 'Todas', ordenar: 'peso', loaded: false, snapData: null, derived: null };
 
@@ -2103,29 +2107,36 @@ sb.auth.getSession().then(function(res){
     return { snap: snap, curva: curvaRes.data || [], atividades: ativRes.data || [] };
   }
 
-  /* ---------- 4. cálculos derivados (curva total mensal, % por área, atrasos) ---------- */
+  /* ---------- 4. cálculos derivados (curva total semanal, % por área, atrasos) ---------- */
   function computeCurvaTotal(curva, corte){
-    var monthMap = {};
+    /* Resolução semanal (uma coluna por semana da PPD, igual ao modelo da planilha:
+       número da semana na régua de cima, nome do mês agrupando várias semanas embaixo)
+       em vez de um ponto por mês — evita rótulo de mês repetido/ambíguo em projetos
+       com mais de 12 meses e reproduz o mesmo "S" que a planilha mostra semana a semana. */
+    var weekMap = {};
     curva.forEach(function(r){
-      if(!r.semana_inicio) return;
-      var key = r.semana_inicio.slice(0,7);
-      if(!monthMap[key]) monthMap[key] = {previsto:0, real:0, minWeekStart:'9999-99'};
-      monthMap[key].previsto += Number(r.previsto_sem)||0;
-      monthMap[key].real += Number(r.real_sem)||0;
-      if(r.semana_inicio < monthMap[key].minWeekStart) monthMap[key].minWeekStart = r.semana_inicio;
+      if(!r.semana_inicio || r.semana_num == null) return;
+      var key = r.ano + '-W' + String(r.semana_num).padStart(2,'0');
+      if(!weekMap[key]) weekMap[key] = { previsto:0, real:0, semana_inicio:r.semana_inicio, semana_num:r.semana_num };
+      weekMap[key].previsto += Number(r.previsto_sem)||0;
+      weekMap[key].real += Number(r.real_sem)||0;
     });
-    var keys = Object.keys(monthMap).sort();
-    var meses = [], previsto = [], real = [];
+    var keys = Object.keys(weekMap).sort(function(a,b){
+      var ia = weekMap[a].semana_inicio, ib = weekMap[b].semana_inicio;
+      return ia < ib ? -1 : (ia > ib ? 1 : 0);
+    });
+    var semanas = [], mesKey = [], previsto = [], real = [];
     var accP = 0, accR = 0;
     keys.forEach(function(k){
-      var m = monthMap[k];
-      accP += m.previsto;
-      meses.push(MESES_PT[parseInt(k.slice(5,7),10)-1] + '/' + k.slice(2,4));
+      var w = weekMap[k];
+      accP += w.previsto;
       previsto.push(accP*100);
-      if(m.minWeekStart <= corte){ accR += m.real; real.push(accR*100); }
+      if(w.semana_inicio <= corte){ accR += w.real; real.push(accR*100); }
       else { real.push(null); }
+      semanas.push(w.semana_num);
+      mesKey.push(w.semana_inicio.slice(0,7));
     });
-    return { meses: meses, previsto: previsto, real: real };
+    return { semanas: semanas, mesKey: mesKey, previsto: previsto, real: real };
   }
 
   function computeAreas(curva, corte){
@@ -2171,12 +2182,20 @@ sb.auth.getSession().then(function(res){
   }
 
   /* ---------- 5. render ---------- */
+  /* Régua de duas linhas igual à planilha: nº da semana em cima, nome do mês
+     embaixo ocupando o bloco de semanas correspondente (sem repetir mês
+     ambíguo — o nº da semana já garante a leitura correta em projetos com
+     mais de 12 meses). A curva "se monta" da esquerda pra direita via uma
+     clip-path animada (mesmo efeito nas duas linhas e na área preenchida). */
   function renderCurva(data){
     var svg = document.getElementById('pl-scurve');
-    var W = 820, H = 260, padL = 40, padR = 40, top = 14, bottom = 230;
-    var n = data.meses.length;
-    if(n < 2){ svg.innerHTML = ''; return -1; }
-    var x = function(i){ return padL + i * (W - padL - padR) / (n - 1); };
+    var n = data.semanas.length;
+    if(n < 2){ svg.innerHTML = ''; svg.removeAttribute('style'); return -1; }
+    var stepX = 15, padL = 34, padR = 22, top = 10, bottom = 168, rowWeek = 184, rowMes = 204, H = 212;
+    var W = padL + padR + (n - 1) * stepX;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.style.width = W + 'px';
+    var x = function(i){ return padL + i * stepX; };
     var y = function(v){ return bottom - (Math.max(0,Math.min(100,v))/100) * (bottom - top); };
     var lastReal = -1;
     data.real.forEach(function(v,i){ if(v != null) lastReal = i; });
@@ -2186,26 +2205,69 @@ sb.auth.getSession().then(function(res){
     }
     var previstoPath = pathFor(data.previsto);
     var realPath = pathFor(data.real);
+
+    var groups = [];
+    data.mesKey.forEach(function(mk, i){
+      var last = groups[groups.length - 1];
+      if(last && last.key === mk) last.end = i;
+      else groups.push({ key: mk, start: i, end: i });
+    });
+
     var gridY = [top, top+(bottom-top)*0.25, top+(bottom-top)*0.5, top+(bottom-top)*0.75, bottom];
     var gridLabels = ['100%','75%','50%','25%','0%'];
     var svgParts = [];
     svgParts.push('<g stroke="var(--surface-3)" stroke-width="1">' + gridY.map(function(gy,i){ return '<line x1="'+padL+'" y1="'+gy+'" x2="'+(W-padR)+'" y2="'+gy+'"' + (i===4?' stroke="var(--border)"':'') + '/>'; }).join('') + '</g>');
-    svgParts.push('<g fill="var(--ink-faint)" font-size="11" text-anchor="end">' + gridY.map(function(gy,i){ return '<text x="'+(padL-8)+'" y="'+(gy+4)+'">'+gridLabels[i]+'</text>'; }).join('') + '</g>');
-    svgParts.push('<g fill="var(--ink-faint)" font-size="11" text-anchor="middle">' + data.meses.map(function(m,i){ return '<text x="'+x(i)+'" y="250">'+m+'</text>'; }).join('') + '</g>');
+    svgParts.push('<g fill="var(--ink-faint)" font-size="10" text-anchor="end">' + gridY.map(function(gy,i){ return '<text x="'+(padL-6)+'" y="'+(gy+3)+'">'+gridLabels[i]+'</text>'; }).join('') + '</g>');
+    svgParts.push('<g fill="var(--ink-faint)" font-size="8" text-anchor="middle">' + data.semanas.map(function(s,i){ return '<text x="'+x(i)+'" y="'+rowWeek+'">'+s+'</text>'; }).join('') + '</g>');
+    svgParts.push('<g stroke="var(--surface-3)" stroke-width="1">' + groups.map(function(g){
+      if(g.start === 0) return '';
+      var gx = (x(g.start - 1) + x(g.start)) / 2;
+      return '<line x1="'+gx.toFixed(1)+'" y1="'+(rowWeek-9)+'" x2="'+gx.toFixed(1)+'" y2="'+(rowMes+4)+'"/>';
+    }).join('') + '</g>');
+    svgParts.push('<g fill="var(--ink-muted)" font-size="10" font-weight="600" text-anchor="middle">' + groups.map(function(g){
+      var cx = (x(g.start) + x(g.end)) / 2;
+      var mnum = parseInt(g.key.slice(5,7), 10) - 1;
+      return '<text x="'+cx.toFixed(1)+'" y="'+rowMes+'">'+MESES_PT_CAP[mnum]+'</text>';
+    }).join('') + '</g>');
+
+    var clipId = 'pl-curve-reveal-' + Date.now();
+    svgParts.push('<clipPath id="'+clipId+'"><rect id="pl-curve-reveal-rect" x="0" y="0" width="0" height="'+H+'"/></clipPath>');
+    var g = ['<g clip-path="url(#'+clipId+')">'];
     if(lastReal >= 0){
-      svgParts.push('<path d="'+realPath+' L '+x(lastReal).toFixed(1)+' '+bottom+' L '+padL+' '+bottom+' Z" fill="var(--primary)" fill-opacity=".08"/>');
+      g.push('<path d="'+realPath+' L '+x(lastReal).toFixed(1)+' '+bottom+' L '+padL+' '+bottom+' Z" fill="var(--primary)" fill-opacity=".08"/>');
     }
-    svgParts.push('<path d="'+previstoPath+'" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="5 4"/>');
-    if(realPath) svgParts.push('<path d="'+realPath+'" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>');
+    g.push('<path d="'+previstoPath+'" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="5 4"/>');
+    if(realPath) g.push('<path d="'+realPath+'" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>');
     if(lastReal >= 0){
       var todayX = x(lastReal);
-      svgParts.push('<line x1="'+todayX.toFixed(1)+'" y1="'+top+'" x2="'+todayX.toFixed(1)+'" y2="'+bottom+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>');
-      svgParts.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.previsto[lastReal]).toFixed(1)+'" r="4" fill="var(--surface)" stroke="var(--ink-faint)" stroke-width="2"/>');
-      svgParts.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.real[lastReal]).toFixed(1)+'" r="4.5" fill="var(--primary)"/>');
-      svgParts.push('<g fill="var(--ink)" font-size="11"><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.previsto[lastReal])-6).toFixed(1)+'">'+fmtPct(data.previsto[lastReal])+'% previsto</text><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.real[lastReal])+18).toFixed(1)+'" font-weight="700" fill="var(--primary)">'+fmtPct(data.real[lastReal])+'% real</text></g>');
+      g.push('<line x1="'+todayX.toFixed(1)+'" y1="'+top+'" x2="'+todayX.toFixed(1)+'" y2="'+bottom+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>');
+      g.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.previsto[lastReal]).toFixed(1)+'" r="4" fill="var(--surface)" stroke="var(--ink-faint)" stroke-width="2"/>');
+      g.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.real[lastReal]).toFixed(1)+'" r="4.5" fill="var(--primary)"/>');
+      g.push('<g fill="var(--ink)" font-size="11"><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.previsto[lastReal])-6).toFixed(1)+'">'+fmtPct(data.previsto[lastReal])+'% previsto</text><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.real[lastReal])+18).toFixed(1)+'" font-weight="700" fill="var(--primary)">'+fmtPct(data.real[lastReal])+'% real</text></g>');
     }
+    g.push('</g>');
+    svgParts.push(g.join(''));
     svg.innerHTML = svgParts.join('');
+
+    animateCurveReveal(document.getElementById('pl-curve-reveal-rect'), W - padR, H);
+    var scroller = svg.closest('.pl-curve-scroll');
+    if(scroller && lastReal >= 0) scroller.scrollLeft = Math.max(0, x(lastReal) - scroller.clientWidth * 0.6);
     return lastReal;
+  }
+
+  function animateCurveReveal(rectEl, toWidth, fullHeight){
+    if(!rectEl) return;
+    var duration = Math.min(2200, Math.max(700, toWidth * 0.9));
+    var start = null;
+    function ease(t){ return 1 - Math.pow(1 - t, 3); }
+    function step(ts){
+      if(start === null) start = ts;
+      var p = Math.min(1, (ts - start) / duration);
+      rectEl.setAttribute('width', (toWidth * ease(p)).toFixed(1));
+      rectEl.setAttribute('height', fullHeight);
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
 
   function renderFilters(){
