@@ -896,6 +896,11 @@ var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, storage: window.sessionStorage }
 });
+// Exposto para o módulo Planejamento reutilizar a MESMA instância/sessão —
+// dois clients independentes com o mesmo storageKey não se sincronizam
+// entre si dentro da mesma aba (o evento "storage" só dispara em outras
+// abas), então um client criado antes do login nunca "vê" a sessão depois.
+window.__mapaSb = sb;
 
 var loginOverlay = document.getElementById('login-overlay');
 var loginForm = document.getElementById('login-form');
@@ -2027,12 +2032,13 @@ sb.auth.getSession().then(function(res){
 
   /* ---------- 2. client Supabase próprio do módulo — schema isolado, sessão compartilhada
      via sessionStorage com o app principal (mesma URL => mesma chave de storage do supabase-js) ---------- */
-  var PL_SUPABASE_URL = "https://yggzgjjwstmchcncgcvv.supabase.co";
-  var PL_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlnZ3pnamp3c3RtY2hjbmNnY3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5Mzc1MTIsImV4cCI6MjEwNDUxMzUxMn0.CJPpdPrlkXwrcps_U0Lf0gB0aWu3uyy6v3MqGrmhj3Y";
-  var sbPlanClient = window.supabase.createClient(PL_SUPABASE_URL, PL_SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, storage: window.sessionStorage }
-  });
-  function plSchema(){ return sbPlanClient.schema('planejamento'); }
+  // Reusa o MESMO client (e a mesma sessão em memória) do app principal —
+  // ver comentário acima de "window.__mapaSb". Criar um segundo client
+  // aqui causava o bug de "Sem permissão para enviar" mesmo logado como
+  // Admin: esse segundo client era instanciado no load da página (antes do
+  // login) e ficava com sessão anônima para sempre, então toda chamada
+  // (select e insert) ia como usuário anônimo, não importa quem logasse.
+  function plSchema(){ return window.__mapaSb.schema('planejamento'); }
 
   var AREA_META = {
     'SE NV': {sub:'Subestação Noronha Verde', grupo:'Subestações'},
