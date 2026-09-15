@@ -500,6 +500,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-summary-note{font-size:12px;color:var(--ink-faint);margin-top:4px}
 .pl-summary-card-alert{border-color:var(--pl-late);flex-direction:row;align-items:center;justify-content:space-between;gap:12px}
 .pl-summary-card-alert .pl-big{color:var(--pl-late)}
+.pl-delta-inner{display:flex;flex-direction:column}
 .pl-status-tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-head);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--pl-late);padding:6px 10px;white-space:nowrap}
 .pl-status-tag.warn{background:var(--pl-warn)}
 .pl-status-tag.ok{background:var(--pl-ok)}
@@ -774,9 +775,10 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <span class="pl-summary-note" id="pl-real-note">medido na última revisão</span>
           </div>
           <div class="pl-summary-card pl-summary-card-alert" id="pl-delta-card">
-            <div>
-              <span class="eyebrow">Desvio</span>
+            <div class="pl-delta-inner">
+              <span class="eyebrow">Desvio do previsto</span>
               <span class="pl-big" id="pl-delta-pct">–<small>%</small></span>
+              <span class="pl-summary-note" id="pl-delta-note">real em relação ao previsto</span>
             </div>
             <span class="pl-status-tag" id="pl-status-tag">Atrasado</span>
           </div>
@@ -2295,9 +2297,13 @@ sb.auth.getSession().then(function(res){
     }).join('');
   }
 
+  var PL_LATE_LIMIT = 10;
   function renderLate(late){
     var rows = late.slice();
     rows.sort(function(a,b){ return plState.ordenar === 'peso' ? b.peso - a.peso : (a.dueRaw||'9999').localeCompare(b.dueRaw||'9999'); });
+    var totalCount = rows.length;
+    var totalWeight = rows.reduce(function(t,r){ return t + r.peso; }, 0);
+    rows = rows.slice(0, PL_LATE_LIMIT);
     var maxPeso = Math.max.apply(null, rows.map(function(r){ return r.peso; }).concat([0.0001]));
     var body = document.getElementById('pl-late-body');
     if(rows.length === 0){
@@ -2317,8 +2323,9 @@ sb.auth.getSession().then(function(res){
         '</tr>';
       }).join('');
     }
-    var lateWeight = rows.reduce(function(t,r){ return t + r.peso; }, 0);
-    document.getElementById('pl-late-summary').textContent = rows.length + ' atividade' + (rows.length===1?'':'s') + ' · ' + fmtPct(lateWeight) + '% do peso do projeto';
+    var summaryTxt = totalCount + ' atividade' + (totalCount===1?'':'s') + ' · ' + fmtPct(totalWeight) + '% do peso do projeto';
+    if(totalCount > PL_LATE_LIMIT) summaryTxt += ' · exibindo as ' + PL_LATE_LIMIT + ' mais críticas';
+    document.getElementById('pl-late-summary').textContent = summaryTxt;
   }
 
   function renderSummary(curvaTotal, lastReal){
@@ -2326,6 +2333,7 @@ sb.auth.getSession().then(function(res){
       document.getElementById('pl-prev-pct').innerHTML = '–<small>%</small>';
       document.getElementById('pl-real-pct').innerHTML = '–<small>%</small>';
       document.getElementById('pl-delta-pct').innerHTML = '–<small>%</small>';
+      document.getElementById('pl-delta-note').textContent = 'real em relação ao previsto';
       document.getElementById('pl-status-tag').textContent = '–';
       return;
     }
@@ -2334,6 +2342,7 @@ sb.auth.getSession().then(function(res){
     document.getElementById('pl-prev-pct').innerHTML = fmtPct(prev) + '<small>%</small>';
     document.getElementById('pl-real-pct').innerHTML = fmtPct(real) + '<small>%</small>';
     document.getElementById('pl-delta-pct').innerHTML = (delta>0?'+':delta<0?'−':'') + fmtPct(Math.abs(delta)) + '<small>%</small>';
+    document.getElementById('pl-delta-note').textContent = delta > 0.05 ? 'avanço real à frente do previsto' : delta < -0.05 ? 'avanço real atrás do previsto' : 'avanço real alinhado ao previsto';
     var card = document.getElementById('pl-delta-card'), tag = document.getElementById('pl-status-tag');
     var cls = statusClassFor(delta);
     var col = delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
