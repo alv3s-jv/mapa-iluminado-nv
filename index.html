@@ -506,9 +506,8 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-status-tag.warn{background:var(--pl-warn)}
 .pl-status-tag.ok{background:var(--pl-ok)}
 
-.pl-areas-block,.pl-late-block{display:flex;flex-direction:column;gap:10px}
-.pl-late-block{background:var(--surface);border:1px solid var(--border);padding:14px 18px 6px}
-.pl-areas-head,.pl-late-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.pl-areas-block{display:flex;flex-direction:column;gap:10px}
+.pl-areas-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .eyebrow .pl-subnote{font-family:var(--font-body);font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink-faint);font-weight:400;margin-left:6px}
 .pl-areas-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .pl-legend-mini{display:flex;gap:14px;font-size:11px;color:var(--ink-faint);flex-wrap:wrap}
@@ -519,8 +518,6 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-seg button{height:32px;padding:0 12px;border:0;border-left:1px solid var(--border);font-family:var(--font-body);font-size:12px;cursor:pointer;background:var(--surface);color:var(--ink-muted)}
 .pl-seg button:first-child{border-left:0}
 .pl-seg button.active{background:var(--primary);color:#fff}
-.pl-sort-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-muted)}
-.pl-sort-row .pl-seg button{height:30px}
 
 .pl-area-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 @media (max-width:1100px){.pl-area-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -544,19 +541,25 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-table th{text-align:left;font-weight:500;font-size:11px;color:var(--ink-muted);padding:4px 0 6px;border-bottom:1px solid var(--border)}
 .pl-table td{padding:9px 0;border-bottom:1px solid var(--surface-2);vertical-align:middle}
 .pl-table tr:hover td{background:var(--surface-2)}
-.pl-col-rank{width:32px}.pl-col-area{width:110px}.pl-col-status{width:170px}.pl-col-due{width:150px}
-.pl-col-days{width:110px;text-align:center}.pl-col-peso{width:180px;text-align:center}
+.pl-col-rank{width:32px}.pl-col-area{width:110px}
+.pl-col-peso{width:180px;text-align:center}
 .pl-t-rank{color:var(--ink-faint);font-variant-numeric:tabular-nums}
 .pl-t-name{font-weight:500;color:var(--ink)}
 .pl-t-area{color:var(--ink-muted)}
-.pl-t-status{display:inline-flex;align-items:center;gap:6px}
-.pl-t-status i{width:8px;height:8px;flex:none}
-.pl-t-due{color:var(--ink);font-variant-numeric:tabular-nums}
-.pl-t-days{text-align:center;color:var(--pl-late);font-weight:500;font-variant-numeric:tabular-nums}
 .pl-t-peso{display:flex;align-items:center;justify-content:center;gap:10px}
 .pl-t-peso-bar{width:90px;height:4px;background:var(--surface-2)}
 .pl-t-peso-bar i{display:block;height:100%;background:var(--primary)}
 .pl-t-peso-val{font-family:var(--font-head);font-weight:600;font-size:15px;color:var(--primary);width:44px;text-align:right;font-variant-numeric:tabular-nums}
+
+.pl-negpos-block{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);padding:14px 18px 6px}
+.pl-negpos-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.pl-negpos-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media (max-width:860px){.pl-negpos-grid{grid-template-columns:1fr}}
+.pl-negpos-col{min-width:0}
+.pl-negpos-col-head{display:flex;align-items:center;gap:6px;font-family:var(--font-head);font-weight:600;font-size:13px;color:var(--ink-muted);padding-bottom:6px;margin-bottom:2px;border-bottom:1px solid var(--border)}
+.pl-col-delta{width:90px;text-align:right}
+.pl-t-delta{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.pl-t-peso-plain{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-muted)}
 .pl-table-foot{font-size:11px;color:var(--ink-faint);display:flex;justify-content:space-between;padding:6px 0 4px;flex-wrap:wrap;gap:8px}
 
 
@@ -804,24 +807,31 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
         <div class="pl-area-grid" id="pl-area-grid"></div>
       </div>
 
-      <div class="pl-late-block">
-        <div class="pl-late-head">
-          <span class="eyebrow">Atividades em atraso <span class="pl-subnote" id="pl-late-summary">– atividades · –% do peso do projeto</span></span>
-          <div class="pl-sort-row">Ordenar por
-            <div class="pl-seg" id="pl-sort-toggle">
-              <button type="button" data-sort="peso" class="active">Peso (maior impacto)</button>
-              <button type="button" data-sort="prazo">Prazo (mais antigo)</button>
-            </div>
+      <div class="pl-negpos-block">
+        <div class="pl-negpos-head">
+          <span class="eyebrow">Top atividades por impacto <span class="pl-subnote" id="pl-negpos-summary">Δ Avanço × peso, corrigido pelo fator de replanejamento</span></span>
+        </div>
+        <div class="pl-negpos-grid">
+          <div class="pl-negpos-col">
+            <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-late)"></i>Top 10 Negativos</div>
+            <table class="pl-table">
+              <thead><tr>
+                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-peso">Peso</th><th class="pl-col-delta">Δ corrigido</th>
+              </tr></thead>
+              <tbody id="pl-neg-body"></tbody>
+            </table>
+          </div>
+          <div class="pl-negpos-col">
+            <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-ok)"></i>Top 10 Positivos</div>
+            <table class="pl-table">
+              <thead><tr>
+                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-peso">Peso</th><th class="pl-col-delta">Δ corrigido</th>
+              </tr></thead>
+              <tbody id="pl-pos-body"></tbody>
+            </table>
           </div>
         </div>
-        <table class="pl-table">
-          <thead><tr>
-            <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-status">Status</th>
-            <th class="pl-col-due">Término previsto</th><th class="pl-col-days">Dias de atraso</th><th class="pl-col-peso">Peso no projeto</th>
-          </tr></thead>
-          <tbody id="pl-late-body"></tbody>
-        </table>
-        <div class="pl-table-foot"><span>Peso = participação da atividade no avanço físico ponderado do projeto (PPD). Dias de atraso contados até a data da revisão.</span><span class="pl-tag">dados ilustrativos</span></div>
+        <div class="pl-table-foot"><span>Δ corrigido = peso unitário × (avanço real − avanço previsto) × fator de correção (<span id="pl-fator-val">–</span>), mesma lógica da aba "Curva - S" da planilha PPD (AD28: Top Positivos/Negativos).</span><span class="pl-tag">dados ilustrativos</span></div>
       </div>
 
     </div>
@@ -2161,26 +2171,28 @@ sb.auth.getSession().then(function(res){
     });
   }
 
-  function computeLate(atividades, corte){
-    var corteDate = new Date(corte + 'T00:00:00');
-    return atividades
-      .filter(function(t){ return t.status === 'ATRASADO' || t.status === 'TÉRMINO EM ATRASO'; })
+  /* Top Negativos/Positivos — mesma lógica da aba "Curva - S" (AD28) da planilha:
+     %Delta Avanço por atividade (Tabela7, nível folha) = peso_unitario × (avanço real
+     − avanço previsto); esse valor bruto é então multiplicado pelo fator de correção
+     do replanejamento (BD.Dados!CK17/CG17) e ranqueado — LARGE/SMALL dos 10 maiores
+     e 10 menores, sem filtrar por sinal (igual à planilha). */
+  function computeTopDeltas(atividades, fator){
+    var f = (typeof fator === 'number' && isFinite(fator) && fator !== 0) ? fator : 1;
+    var rows = atividades
+      .filter(function(t){ return t.peso_unitario != null && t.avanco_previsto != null && t.avanco_real != null; })
       .map(function(t){
-        var due = t.data_fim_prevista ? new Date(t.data_fim_prevista + 'T00:00:00') : null;
-        var dias = due ? Math.max(0, Math.round((corteDate - due) / 864e5)) : 0;
-        return {
-          nome: t.nome_tarefa, area: t.local, status: t.status,
-          termino: fmtDateBR(t.data_fim_prevista), dueRaw: t.data_fim_prevista,
-          dias: dias, peso: (Number(t.peso_unitario)||0) * 100
-        };
+        var deltaRaw = (Number(t.peso_unitario)||0) * ((Number(t.avanco_real)||0) - (Number(t.avanco_previsto)||0));
+        return { nome: t.nome_tarefa, area: t.local, peso: (Number(t.peso_unitario)||0) * 100, delta: deltaRaw * f * 100 };
       });
+    var sorted = rows.slice().sort(function(a,b){ return a.delta - b.delta; });
+    return { negativos: sorted.slice(0, 10), positivos: sorted.slice(-10).reverse(), fator: f };
   }
 
   function computeDerived(snapData, corte){
     return {
       curvaTotal: computeCurvaTotal(snapData.curva, corte),
       areas: computeAreas(snapData.curva, corte),
-      late: computeLate(snapData.atividades, corte)
+      topDeltas: computeTopDeltas(snapData.atividades, snapData.snap ? snapData.snap.fator_correcao : null)
     };
   }
 
@@ -2298,35 +2310,29 @@ sb.auth.getSession().then(function(res){
     }).join('');
   }
 
-  var PL_LATE_LIMIT = 10;
-  function renderLate(late){
-    var rows = late.slice();
-    rows.sort(function(a,b){ return plState.ordenar === 'peso' ? b.peso - a.peso : (a.dueRaw||'9999').localeCompare(b.dueRaw||'9999'); });
-    var totalCount = rows.length;
-    var totalWeight = rows.reduce(function(t,r){ return t + r.peso; }, 0);
-    rows = rows.slice(0, PL_LATE_LIMIT);
-    var maxPeso = Math.max.apply(null, rows.map(function(r){ return r.peso; }).concat([0.0001]));
-    var body = document.getElementById('pl-late-body');
-    if(rows.length === 0){
-      body.innerHTML = '<tr><td colspan="7" style="color:var(--ink-faint);padding:12px 0">Nenhuma atividade em atraso na revisão atual.</td></tr>';
-    } else {
-      body.innerHTML = rows.map(function(r,i){
-        var statusColor = r.status === 'ATRASADO' ? 'var(--pl-late)' : 'var(--pl-warn)';
+  function renderTopDeltas(topDeltas){
+    function paintList(list, bodyId){
+      var body = document.getElementById(bodyId);
+      if(!list.length){
+        body.innerHTML = '<tr><td colspan="5" style="color:var(--ink-faint);padding:12px 0">Sem dados suficientes na revisão atual.</td></tr>';
+        return;
+      }
+      body.innerHTML = list.map(function(r,i){
+        var color = r.delta < 0 ? 'var(--pl-late)' : r.delta > 0 ? 'var(--pl-ok)' : 'var(--ink-muted)';
+        var sign = r.delta > 0 ? '+' : (r.delta < 0 ? '−' : '');
         return '<tr>' +
           '<td class="pl-t-rank">'+String(i+1).padStart(2,'0')+'</td>' +
           '<td class="pl-t-name">'+r.nome+'</td>' +
           '<td class="pl-t-area">'+r.area+'</td>' +
-          '<td><span class="pl-t-status" style="color:'+statusColor+'"><i style="background:'+statusColor+'"></i>'+r.status+'</span></td>' +
-          '<td class="pl-t-due">'+r.termino+'</td>' +
-          '<td class="pl-t-days">'+r.dias+'</td>' +
-          '<td><div class="pl-t-peso"><div class="pl-t-peso-bar"><i style="width:'+(r.peso/maxPeso*100)+'%"></i></div>' +
-          '<span class="pl-t-peso-val">'+fmtPct(r.peso)+'%</span></div></td>' +
+          '<td class="pl-t-peso-plain">'+fmtPct(r.peso)+'%</td>' +
+          '<td class="pl-t-delta" style="color:'+color+'">'+sign+fmtPct(Math.abs(r.delta))+'%</td>' +
         '</tr>';
       }).join('');
     }
-    var summaryTxt = totalCount + ' atividade' + (totalCount===1?'':'s') + ' · ' + fmtPct(totalWeight) + '% do peso do projeto';
-    if(totalCount > PL_LATE_LIMIT) summaryTxt += ' · exibindo as ' + PL_LATE_LIMIT + ' mais críticas';
-    document.getElementById('pl-late-summary').textContent = summaryTxt;
+    paintList(topDeltas.negativos, 'pl-neg-body');
+    paintList(topDeltas.positivos, 'pl-pos-body');
+    var fatorEl = document.getElementById('pl-fator-val');
+    if(fatorEl) fatorEl.textContent = topDeltas.fator.toLocaleString('pt-BR', {minimumFractionDigits:4, maximumFractionDigits:4});
   }
 
   function renderSummary(curvaTotal, lastReal){
@@ -2363,7 +2369,7 @@ sb.auth.getSession().then(function(res){
     div.style.cssText = 'padding:48px 16px;text-align:center;color:var(--ink-faint);font-size:14px';
     div.innerHTML = msg;
     scroll.insertBefore(div, scroll.firstChild.nextSibling);
-    ['.pl-top-grid', '.pl-areas-block', '.pl-late-block'].forEach(function(sel){
+    ['.pl-top-grid', '.pl-areas-block', '.pl-negpos-block'].forEach(function(sel){
       var el = document.querySelector(sel);
       if(el) el.style.display = 'none';
     });
@@ -2372,7 +2378,7 @@ sb.auth.getSession().then(function(res){
   function clearEmptyState(){
     var existing = document.getElementById('pl-empty-state');
     if(existing) existing.remove();
-    ['.pl-top-grid', '.pl-areas-block', '.pl-late-block'].forEach(function(sel){
+    ['.pl-top-grid', '.pl-areas-block', '.pl-negpos-block'].forEach(function(sel){
       var el = document.querySelector(sel);
       if(el) el.style.display = '';
     });
@@ -2406,19 +2412,13 @@ sb.auth.getSession().then(function(res){
     renderSummary(derived.curvaTotal, lastReal);
     renderFilters();
     renderAreas(derived.areas);
-    renderLate(derived.late);
+    renderTopDeltas(derived.topDeltas);
     plState.loaded = true;
   }
 
   document.getElementById('pl-area-filters').addEventListener('click', function(e){
     var btn = e.target.closest('button'); if(!btn || !plState.derived) return;
     plState.filtro = btn.dataset.g; renderFilters(); renderAreas(plState.derived.areas);
-  });
-  document.getElementById('pl-sort-toggle').addEventListener('click', function(e){
-    var btn = e.target.closest('button'); if(!btn || !plState.derived) return;
-    plState.ordenar = btn.dataset.sort;
-    document.getElementById('pl-sort-toggle').querySelectorAll('button').forEach(function(b){ b.classList.toggle('active', b===btn); });
-    renderLate(plState.derived.late);
   });
 
   /* ================= 6. upload / importação da planilha PPD ================= */
@@ -2427,6 +2427,9 @@ sb.auth.getSession().then(function(res){
   var BD_REAL_ROWS = [34, 35, 36, 37, 38, 39, 40, 41, 42, 43];
   var BD_PREV_TOTAL_ROW = 32, BD_REAL_TOTAL_ROW = 45;
   var BD_WEEK_COL_START = 5, BD_ROW_SEMANA_NUM = 8, BD_ROW_SEMANA_LABEL = 9, BD_ROW_SEMANA_INICIO = 10, BD_ROW_SEMANA_FIM = 11, BD_COL_LOCAL = 4;
+  /* Fator de correção do replanejamento — BD.Dados!CK17 / BD.Dados!CG17 (linha "%REV15
+     APÓS S34" / "...CORRIGIDO"). Usado para corrigir o %Delta Avanço no Top Negativos/Positivos. */
+  var BD_FATOR_ROW = 17, BD_FATOR_CG_COL = 85, BD_FATOR_CK_COL = 89;
   var QT_HEADER_ROW = 10, QT_DATA_START_ROW = 11;
   var QT_COL = { local:1, servico:2, id:3, nome:4, iniPrev:5, termPrev:6, iniReal:9, termReal:10, status:12, peso:19, avPrev:21, avReal:22 };
 
@@ -2507,7 +2510,15 @@ sb.auth.getSession().then(function(res){
     if(Math.abs(sumRow32 - sumPrev) > 0.001 || Math.abs(sumRow45 - sumReal) > 0.001){
       warnings.push('Soma das áreas diverge do total oficial da aba BD.Dados — confira antes de confirmar.');
     }
-    return curva;
+
+    var cg17 = plNum(plCellVal(ws, BD_FATOR_ROW, BD_FATOR_CG_COL));
+    var ck17 = plNum(plCellVal(ws, BD_FATOR_ROW, BD_FATOR_CK_COL));
+    var fator = (cg17 && cg17 !== 0 && ck17 != null) ? (ck17 / cg17) : null;
+    if(fator == null){
+      warnings.push('Fator de correção (BD.Dados!CK17/CG17) não encontrado ou inválido — Top Negativos/Positivos serão calculados sem correção (fator = 1,0000).');
+    }
+
+    return { curva: curva, fator: fator };
   }
 
   function plParseAtividades(wb, warnings){
@@ -2550,10 +2561,10 @@ sb.auth.getSession().then(function(res){
 
   function plParsePPD(wb, filename){
     var warnings = [];
-    var curva = plParseCurva(wb, warnings);
+    var curvaRes = plParseCurva(wb, warnings);
     var r = plParseAtividades(wb, warnings);
     var revisao = plParseRevisaoFromFilename(filename) || 'Revisão não identificada';
-    return { revisao: revisao, data_corte: r.dataCorte, arquivo_origem: filename || null, curva: curva, atividades: r.atividades, warnings: warnings };
+    return { revisao: revisao, data_corte: r.dataCorte, arquivo_origem: filename || null, curva: curvaRes.curva, fator_correcao: curvaRes.fator, atividades: r.atividades, warnings: warnings };
   }
 
   /* ---------- modal de upload ---------- */
@@ -2616,6 +2627,7 @@ sb.auth.getSession().then(function(res){
           '<p><b>Data de corte:</b> ' + fmtDateBR(parsedResult.data_corte) + '</p>' +
           '<p><b>Pontos da curva S:</b> ' + parsedResult.curva.length + ' (10 áreas × semanas)</p>' +
           '<p><b>Atividades:</b> ' + parsedResult.atividades.length + '</p>' +
+          '<p><b>Fator de correção:</b> ' + (parsedResult.fator_correcao != null ? parsedResult.fator_correcao.toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4}) : '– (não encontrado, será tratado como 1,0000)') + '</p>' +
           warnHtml;
         submitBtn.disabled = false;
       } catch(err){
@@ -2637,7 +2649,8 @@ sb.auth.getSession().then(function(res){
           p_data_corte: parsedResult.data_corte,
           p_arquivo: parsedResult.arquivo_origem,
           p_curva: parsedResult.curva,
-          p_atividades: parsedResult.atividades
+          p_atividades: parsedResult.atividades,
+          p_fator_correcao: parsedResult.fator_correcao
         });
         if(error) throw error;
         logEl.textContent = 'Importado com sucesso (snapshot #' + data + ').';
