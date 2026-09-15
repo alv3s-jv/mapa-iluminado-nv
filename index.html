@@ -1521,7 +1521,7 @@ async function boot(){
       if(!byLocal[local]) byLocal[local] = {};
       if(!byLocal[local][name]) byLocal[local][name] = [0,0];
       byLocal[local][name][1]++;
-      if(stages.finalizado) byLocal[local][name][0]++;
+      if(stages.concretagem_estrutural) byLocal[local][name][0]++;
     });
     function miniBarType(lbl, done, total){
       var p = total ? 100*done/total : 0;
