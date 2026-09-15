@@ -212,9 +212,10 @@ a{color:var(--primary)} a:hover{color:var(--accent)}
 .btn-icon{width:40px;height:40px;padding:0;border-color:var(--border-strong);color:var(--primary);background:var(--surface)}
 .logout-link{font-size:13px;color:var(--primary);cursor:pointer;text-decoration:none;background:none;border:none;font-family:inherit;padding:0 4px}
 .logout-link:hover{color:var(--accent);text-decoration:underline}
+.mapa-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:10px calc(16px + env(safe-area-inset-right)) 10px calc(16px + env(safe-area-inset-left));background:var(--surface);border-bottom:1px solid var(--border);flex:none}
 
 /* ---------- KPI STRIP ---------- */
-.kpi-bar{display:grid;grid-template-columns:min(380px,92vw) repeat(4,minmax(0,1fr));background:var(--surface);border-bottom:1px solid var(--border);flex:none}
+.kpi-bar{display:grid;grid-template-columns:min(380px,92vw) repeat(2,minmax(0,1fr));background:var(--surface);border-bottom:1px solid var(--border);flex:none}
 .kpi-chip{padding:12px 18px;border-right:1px solid var(--border);min-width:0}
 .kpi-chip:last-child{border-right:none}
 .kpi-chip .k-label{display:block;font-family:var(--font-head);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-muted)}
@@ -369,7 +370,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
   .search input{font-size:16px}
 }
 @media (max-width:720px){
-  .kpi-bar{grid-template-columns:repeat(5,minmax(96px,1fr));overflow-x:auto}
+  .kpi-bar{grid-template-columns:repeat(3,minmax(96px,1fr));overflow-x:auto}
   .btn-text{display:none}
   .brand-text h1{font-size:18px}
   .legend-float{max-width:220px}
@@ -629,11 +630,6 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
       </div>
     </div>
     <div class="top-actions">
-      <div class="updated-badge" id="updated-badge">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        <span><span class="long">Atualizado em </span><b id="updated-at">–</b></span>
-      </div>
-      <button class="btn" id="update-open-btn" type="button" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 9l6-6 6 6M4 21h16"/></svg><span class="btn-text">Atualizar dados</span></button>
       <button class="logout-link" id="logout-btn" type="button">Sair</button>
     </div>
   </header>
@@ -641,6 +637,14 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
   <div class="top-tabs" id="top-tabs">
     <button class="top-tab active" type="button" data-view="mapa">Mapa iluminado</button>
     <button class="top-tab" type="button" data-view="planejamento">Planejamento</button>
+  </div>
+
+  <div class="mapa-toolbar" id="mapa-toolbar">
+    <div class="updated-badge" id="updated-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span><span class="long">Atualizado em </span><b id="updated-at">–</b></span>
+    </div>
+    <button class="btn" id="update-open-btn" type="button" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M6 9l6-6 6 6M4 21h16"/></svg><span class="btn-text">Atualizar dados</span></button>
   </div>
 
   <div class="kpi-bar" id="kpi-bar"></div>
@@ -1570,8 +1574,6 @@ async function boot(){
       {label: 'Estacas', pct: e.pct, sub: e.sub},
       {label: 'Mesas', pct: m.pct, sub: m.sub},
       {label: 'Módulos', pct: mo.pct, sub: mo.sub},
-      {label: 'Supressão vegetal', pct: stPct, sub: fmtArea(st.LIMPEZA||0) + ' de ' + fmtArea(stTotal)},
-      {label: 'Terraplenagem', pct: ttPct, sub: fmtArea(tt.CONCLUIDO||0) + ' de ' + fmtArea(ttTotal)},
     ];
 
     bar.innerHTML = items.map(function(it){
@@ -2027,7 +2029,7 @@ sb.auth.getSession().then(function(res){
 (function(){
   /* ---------- 1. troca de view no nível superior (Mapa iluminado / Planejamento) ---------- */
   var topTabs = document.getElementById('top-tabs');
-  var mapaViews = [document.querySelector('.kpi-bar'), document.querySelector('.body-row')];
+  var mapaViews = [document.querySelector('.mapa-toolbar'), document.querySelector('.kpi-bar'), document.querySelector('.body-row')];
   var plView = document.getElementById('planejamento-view');
   var plBooted = false;
 
