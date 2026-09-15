@@ -542,14 +542,9 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-table td{padding:9px 0;border-bottom:1px solid var(--surface-2);vertical-align:middle}
 .pl-table tr:hover td{background:var(--surface-2)}
 .pl-col-rank{width:32px}.pl-col-area{width:110px}
-.pl-col-peso{width:180px;text-align:center}
 .pl-t-rank{color:var(--ink-faint);font-variant-numeric:tabular-nums}
 .pl-t-name{font-weight:500;color:var(--ink)}
 .pl-t-area{color:var(--ink-muted)}
-.pl-t-peso{display:flex;align-items:center;justify-content:center;gap:10px}
-.pl-t-peso-bar{width:90px;height:4px;background:var(--surface-2)}
-.pl-t-peso-bar i{display:block;height:100%;background:var(--primary)}
-.pl-t-peso-val{font-family:var(--font-head);font-weight:600;font-size:15px;color:var(--primary);width:44px;text-align:right;font-variant-numeric:tabular-nums}
 
 .pl-negpos-block{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);padding:14px 18px 6px}
 .pl-negpos-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
@@ -559,7 +554,6 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-negpos-col-head{display:flex;align-items:center;gap:6px;font-family:var(--font-head);font-weight:600;font-size:13px;color:var(--ink-muted);padding-bottom:6px;margin-bottom:2px;border-bottom:1px solid var(--border)}
 .pl-col-delta{width:90px;text-align:right}
 .pl-t-delta{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
-.pl-t-peso-plain{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-muted)}
 .pl-table-foot{font-size:11px;color:var(--ink-faint);display:flex;justify-content:space-between;padding:6px 0 4px;flex-wrap:wrap;gap:8px}
 
 
@@ -816,7 +810,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-late)"></i>Top 10 Negativos</div>
             <table class="pl-table">
               <thead><tr>
-                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-peso">Peso</th><th class="pl-col-delta">Δ corrigido</th>
+                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-delta">Δ corrigido</th>
               </tr></thead>
               <tbody id="pl-neg-body"></tbody>
             </table>
@@ -825,7 +819,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-ok)"></i>Top 10 Positivos</div>
             <table class="pl-table">
               <thead><tr>
-                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-peso">Peso</th><th class="pl-col-delta">Δ corrigido</th>
+                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-delta">Δ corrigido</th>
               </tr></thead>
               <tbody id="pl-pos-body"></tbody>
             </table>
@@ -2314,7 +2308,7 @@ sb.auth.getSession().then(function(res){
     function paintList(list, bodyId){
       var body = document.getElementById(bodyId);
       if(!list.length){
-        body.innerHTML = '<tr><td colspan="5" style="color:var(--ink-faint);padding:12px 0">Sem dados suficientes na revisão atual.</td></tr>';
+        body.innerHTML = '<tr><td colspan="4" style="color:var(--ink-faint);padding:12px 0">Sem dados suficientes na revisão atual.</td></tr>';
         return;
       }
       body.innerHTML = list.map(function(r,i){
@@ -2324,7 +2318,6 @@ sb.auth.getSession().then(function(res){
           '<td class="pl-t-rank">'+String(i+1).padStart(2,'0')+'</td>' +
           '<td class="pl-t-name">'+r.nome+'</td>' +
           '<td class="pl-t-area">'+r.area+'</td>' +
-          '<td class="pl-t-peso-plain">'+fmtPct(r.peso)+'%</td>' +
           '<td class="pl-t-delta" style="color:'+color+'">'+sign+fmtPct(Math.abs(r.delta))+'%</td>' +
         '</tr>';
       }).join('');
