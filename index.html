@@ -2363,6 +2363,15 @@ sb.auth.getSession().then(function(res){
     var cell = ws[addr];
     return cell ? cell.v : undefined;
   }
+  /* Normaliza valor de célula pra coluna numeric do Postgres: undefined/null/""/
+     texto não numérico viram null (em vez de deixar "" vazar pro insert e estourar
+     "invalid input syntax for type numeric" — foi exatamente o que aconteceu com
+     real_sem/avanco_previsto/avanco_real quando a célula existe mas está vazia). */
+  function plNum(v){
+    if(v === undefined || v === null || v === '') return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
+  }
   function plExcelDateToISO(v){
     if(v == null) return null;
     if(v instanceof Date) return v.toISOString().slice(0,10);
@@ -2415,9 +2424,9 @@ sb.auth.getSession().then(function(res){
       var ano = m ? parseInt(m[1],10) : (semanaInicio ? parseInt(semanaInicio.slice(0,4),10) : null);
       if(!ano || semanaNum == null) continue;
       AREA_ORDER_PARSE.forEach(function(area, i){
-        var prev = plCellVal(ws, BD_PREV_ROWS[i], col) || 0;
-        var real = plCellVal(ws, BD_REAL_ROWS[i], col);
-        curva.push({ local: area, ano: ano, semana_num: semanaNum, semana_inicio: semanaInicio, semana_fim: semanaFim, previsto_sem: prev, real_sem: real == null ? null : real });
+        var prev = plNum(plCellVal(ws, BD_PREV_ROWS[i], col)) || 0;
+        var real = plNum(plCellVal(ws, BD_REAL_ROWS[i], col));
+        curva.push({ local: area, ano: ano, semana_num: semanaNum, semana_inicio: semanaInicio, semana_fim: semanaFim, previsto_sem: prev, real_sem: real });
         sumPrev += prev; sumReal += (real || 0);
       });
     }
@@ -2445,7 +2454,7 @@ sb.auth.getSession().then(function(res){
     for(var r = QT_DATA_START_ROW; r <= maxRow; r++){
       var local = plCellVal(ws, r, QT_COL.local);
       if(local == null || local === '') continue;
-      var peso = plCellVal(ws, r, QT_COL.peso) || 0;
+      var peso = plNum(plCellVal(ws, r, QT_COL.peso)) || 0;
       pesoSum += peso;
       atividades.push({
         local: String(local).trim(),
@@ -2457,8 +2466,8 @@ sb.auth.getSession().then(function(res){
         data_inicio_real: plExcelDateToISO(plCellVal(ws, r, QT_COL.iniReal)),
         data_fim_real: plExcelDateToISO(plCellVal(ws, r, QT_COL.termReal)),
         peso_unitario: peso,
-        avanco_previsto: plCellVal(ws, r, QT_COL.avPrev),
-        avanco_real: plCellVal(ws, r, QT_COL.avReal)
+        avanco_previsto: plNum(plCellVal(ws, r, QT_COL.avPrev)),
+        avanco_real: plNum(plCellVal(ws, r, QT_COL.avReal))
       });
     }
     if(pesoSum < 0.9 || pesoSum > 1.1) warnings.push('Soma de "% Peso Unitário" das tarefas = ' + (pesoSum*100).toFixed(1) + '% (esperado ~100%).');
