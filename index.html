@@ -648,6 +648,27 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
   .sidebar:not(.expanded) .nv-card .nv-right{text-align:left}
   .sidebar:not(.expanded) .nv-card .nv-pct{font-size:15px}
 }
+
+/* ================= ABA PLANEJAMENTO — mobile (<=760px) ================= */
+@media (max-width:760px){
+  .pl-head{align-items:flex-start;flex-direction:column;gap:10px}
+  .pl-head-title h2{font-size:18px;line-height:1.2}
+  .pl-source-row{width:100%;flex-direction:column;align-items:stretch;gap:8px}
+  .pl-source{flex-wrap:wrap;height:auto;padding:8px 10px;white-space:normal}
+  #pl-update-open-btn{width:100%;height:40px}
+  #pl-update-open-btn .btn-text{display:inline}
+
+  .pl-top-grid{grid-template-columns:1fr}
+  .pl-curve-legend{font-size:10px;gap:10px}
+  .pl-summary-col{grid-template-rows:none;grid-template-columns:1fr 1fr;gap:8px}
+  .pl-summary-card-alert{grid-column:1 / -1;flex-direction:row}
+  .pl-big{font-size:26px}
+
+  .pl-areas-controls{width:100%;flex-direction:column;align-items:stretch;gap:8px}
+  .pl-legend-mini{font-size:10px;gap:8px 12px}
+  .pl-seg{overflow-x:auto}
+  .pl-area-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 </style>
 
 <div class="login-overlay hidden" id="login-overlay">
