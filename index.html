@@ -2162,9 +2162,17 @@ sb.auth.getSession().then(function(res){
     return AREA_ORDER.filter(function(a){ return byArea[a]; }).map(function(area){
       var a = byArea[area];
       var meta = AREA_META[area] || {sub:'', grupo:'Outros'};
-      var previstoPct = a.prevFull > 0 ? (a.prevToCorte/a.prevFull*100) : 0;
-      var realPct = a.prevFull > 0 ? (a.realToCorte/a.prevFull*100) : 0;
-      return { nome: area, sub: meta.sub, grupo: meta.grupo, previsto: previstoPct, real: realPct };
+      /* Previsto/Real/Desvio em valor bruto -- igual a aba "Curva - S" (filtro Y27):
+         Previsto Acum. Rev15, Realizado Acum. e Desvio Acum. (Realizado-Previsto),
+         sem normalizar pelo peso da area no total do projeto. Bate ponto a ponto
+         com a planilha. barPrevisto/barReal continuam normalizados pelo peso
+         proprio da area so para desenhar a barra visual -- nao aparecem nos
+         numeros exibidos. */
+      var previsto = a.prevToCorte * 100;
+      var real = a.realToCorte * 100;
+      var barPrevisto = a.prevFull > 0 ? (a.prevToCorte/a.prevFull*100) : 0;
+      var barReal = a.prevFull > 0 ? (a.realToCorte/a.prevFull*100) : 0;
+      return { nome: area, sub: meta.sub, grupo: meta.grupo, previsto: previsto, real: real, desvio: real - previsto, barPrevisto: barPrevisto, barReal: barReal };
     });
   }
 
@@ -2314,14 +2322,14 @@ sb.auth.getSession().then(function(res){
     var list = areas.filter(function(a){ return plState.filtro === 'Todas' || a.grupo === plState.filtro; });
     if(list.length === 0){ grid.innerHTML = '<p style="color:var(--ink-faint);font-size:13px">Sem áreas nesse filtro.</p>'; return; }
     grid.innerHTML = list.map(function(a){
-      var delta = a.real - a.previsto;
-      var color = colorFor(delta);
-      var deltaLabel = Math.abs(delta) < 0.05 ? '0,0%' : (delta > 0 ? '+' : '−') + fmtPct(Math.abs(delta)) + '%';
+      var deltaVisual = a.barReal - a.barPrevisto;
+      var color = colorFor(deltaVisual);
+      var deltaLabel = Math.abs(a.desvio) < 0.05 ? '0,0%' : (a.desvio > 0 ? '+' : '−') + fmtPct(Math.abs(a.desvio)) + '%';
       return '<div class="pl-area-card">' +
         '<div class="pl-area-card-head"><div class="pl-area-name"><b>'+a.nome+'</b><span>'+a.sub+'</span></div>' +
-        '<span class="pl-area-delta" style="background:'+color+'">'+deltaLabel+'</span></div>' +
-        '<div class="pl-area-bar"><div class="pl-area-bar-fill" style="background:'+color+';width:'+Math.max(0,Math.min(100,a.real))+'%"></div>' +
-        '<div class="pl-area-bar-mark" style="left:calc('+Math.max(0,Math.min(100,a.previsto))+'% - 1px)"></div></div>' +
+        '<span class="pl-area-delta" style="background:'+color+'" title="Desvio acumulado (igual a planilha)">'+deltaLabel+'</span></div>' +
+        '<div class="pl-area-bar"><div class="pl-area-bar-fill" style="background:'+color+';width:'+Math.max(0,Math.min(100,a.barReal))+'%"></div>' +
+        '<div class="pl-area-bar-mark" style="left:calc('+Math.max(0,Math.min(100,a.barPrevisto))+'% - 1px)"></div></div>' +
         '<div class="pl-area-nums"><div><span>Previsto</span><b>'+fmtPct(a.previsto)+'<small>%</small></b></div>' +
         '<div class="r"><span>Real</span><b>'+fmtPct(a.real)+'<small>%</small></b></div></div>' +
       '</div>';
