@@ -555,6 +555,16 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-t-mae{color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
 
 .pl-negpos-block{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);padding:14px 18px 6px}
+.pl-skeleton{display:flex;flex-direction:column;gap:16px}
+.pl-sk-block{background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 37%,var(--surface-2) 63%);background-size:400% 100%;animation:pl-shimmer 1.4s ease infinite;border-radius:2px}
+@keyframes pl-shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+.pl-sk-top{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px}
+@media (max-width:1100px){.pl-sk-top{grid-template-columns:1fr}}
+.pl-sk-col{display:flex;flex-direction:column;gap:10px}
+.pl-sk-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:1100px){.pl-sk-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:720px){.pl-sk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){.pl-sk-block{animation:none}}
 .pl-negpos-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .pl-negpos-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 @media (max-width:860px){.pl-negpos-grid{grid-template-columns:1fr}}
@@ -2411,6 +2421,7 @@ sb.auth.getSession().then(function(res){
   }
 
   function renderEmptyState(msg){
+    clearLoadingState();
     var scroll = document.querySelector('.pl-scroll');
     if(!scroll) return;
     var existing = document.getElementById('pl-empty-state');
@@ -2433,6 +2444,41 @@ sb.auth.getSession().then(function(res){
       var el = document.querySelector(sel);
       if(el) el.style.display = '';
     });
+  }
+
+  /* Esqueleto (shimmer) mostrado enquanto busca o snapshot no Supabase -- evita a
+     tela ficar em branco/travada com o conteúdo da revisão anterior durante o
+     fetch, que acontece toda vez que a aba Planejamento é aberta (não só na
+     primeira carga). Some assim que o resultado chega, com dado ou vazio. */
+  function renderLoadingState(){
+    clearEmptyState();
+    var scroll = document.querySelector('.pl-scroll');
+    if(!scroll) return;
+    clearLoadingState();
+    var div = document.createElement('div');
+    div.id = 'pl-loading-state';
+    div.className = 'pl-skeleton';
+    div.innerHTML =
+      '<div class="pl-sk-top">' +
+        '<div class="pl-sk-block" style="height:260px"></div>' +
+        '<div class="pl-sk-col">' +
+          '<div class="pl-sk-block" style="height:76px"></div>' +
+          '<div class="pl-sk-block" style="height:76px"></div>' +
+          '<div class="pl-sk-block" style="height:76px"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="pl-sk-grid">' + Array(10).fill('<div class="pl-sk-block" style="height:90px"></div>').join('') + '</div>' +
+      '<div class="pl-sk-block" style="height:280px"></div>';
+    scroll.insertBefore(div, scroll.firstChild.nextSibling);
+    ['.pl-top-grid', '.pl-areas-block', '.pl-negpos-block'].forEach(function(sel){
+      var el = document.querySelector(sel);
+      if(el) el.style.display = 'none';
+    });
+  }
+
+  function clearLoadingState(){
+    var existing = document.getElementById('pl-loading-state');
+    if(existing) existing.remove();
   }
 
   /* Renderiza curva, resumo, cards de área e Top Negativos/Positivos a partir de um
@@ -2476,12 +2522,14 @@ sb.auth.getSession().then(function(res){
   }
 
   async function renderPlanejamento(){
+    renderLoadingState();
     var result = await fetchCurrentSnapshot();
     if(result.error){
       renderEmptyState('Não foi possível carregar os dados de planejamento agora. Tente novamente em instantes.');
       return;
     }
     if(!result.snap){
+      clearLoadingState();
       document.getElementById('pl-rev').textContent = '–';
       document.getElementById('pl-rev-2').textContent = '–';
       document.getElementById('pl-updated-at').textContent = '–';
@@ -2489,6 +2537,7 @@ sb.auth.getSession().then(function(res){
       plState.loaded = true;
       return;
     }
+    clearLoadingState();
     clearEmptyState();
     plState.snapData = result;
     plState.areaSelecionada = null;
