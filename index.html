@@ -138,6 +138,7 @@
   --ink:#1d1f20; --ink-muted:#5d5d60; --ink-faint:#7a7a7d;
   --border:#d4d4d7; --border-strong:#1d1f20;
   --primary:#0f3d5f; --primary-ink:#ffffff; --primary-tint:#eef6ff;
+  --pl-curve-prev:#8a8478; --pl-curve-real:#1a5ea3;
   --accent:#e2740e; --accent-deep:#c86408; --accent-ink:#ffffff;
   --status-done:#158a3e; --status-done-fill:#158a3e; --status-done-edge:#0f6a2f;
   --status-progress:#5980a6; --status-progress-deep:#416180;
@@ -152,6 +153,7 @@
     --bg:#0a1420; --surface:#101d2c; --surface-2:#16283a; --surface-3:#1e3348;
     --ink:#e8eef5; --ink-muted:#93a7bc; --ink-faint:#5c7086;
     --border:#233650; --border-strong:#93a7bc; --primary:#9ebbd8; --primary-ink:#0a1420; --primary-tint:#16283a;
+    --pl-curve-prev:#a89a86; --pl-curve-real:#4fa8ff;
     --status-none:#2c3b4c; --status-none-ink:#93a7bc;
     --shadow:0 12px 32px rgba(0,0,0,.55); --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --map-canvas:#0c1a26; --map-grid:rgba(140,180,210,.08);
@@ -161,6 +163,7 @@
   --bg:#0a1420; --surface:#101d2c; --surface-2:#16283a; --surface-3:#1e3348;
   --ink:#e8eef5; --ink-muted:#93a7bc; --ink-faint:#5c7086;
   --border:#233650; --border-strong:#93a7bc; --primary:#9ebbd8; --primary-ink:#0a1420; --primary-tint:#16283a;
+  --pl-curve-prev:#a89a86; --pl-curve-real:#4fa8ff;
   --status-none:#2c3b4c; --status-none-ink:#93a7bc;
   --shadow:0 12px 32px rgba(0,0,0,.55); --shadow-sm:0 1px 2px rgba(0,0,0,.4);
   --map-canvas:#0c1a26; --map-grid:rgba(140,180,210,.08);
@@ -483,8 +486,8 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-curve-legend{display:flex;gap:16px;font-size:12px;color:var(--ink-muted)}
 .pl-curve-legend span{display:inline-flex;align-items:center;gap:6px}
 .pl-lg{display:inline-block;width:18px}
-.pl-lg-dash{height:0;border-top:2px dashed var(--ink-faint)}
-.pl-lg-solid{height:3px;background:var(--primary)}
+.pl-lg-dash{height:0;border-top:3px dashed var(--pl-curve-prev)}
+.pl-lg-solid{height:3px;background:var(--pl-curve-real)}
 .pl-lg-vline{width:0!important;height:12px;border-left:1px dashed var(--accent)}
 .pl-curve-svg{width:100%;height:auto;display:block;font-family:var(--font-body)}
 .pl-curve-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
@@ -2239,42 +2242,63 @@ sb.auth.getSession().then(function(res){
       return '<text x="'+cx.toFixed(1)+'" y="'+rowMes+'">'+MESES_PT_CAP[mnum]+'</text>';
     }).join('') + '</g>');
 
-    var clipId = 'pl-curve-reveal-' + Date.now();
-    svgParts.push('<clipPath id="'+clipId+'"><rect id="pl-curve-reveal-rect" x="0" y="0" width="0" height="'+H+'"/></clipPath>');
-    var g = ['<g clip-path="url(#'+clipId+')">'];
+    /* Previsto e Real revelam em clipPaths separados, com Real defasado atrás de
+       Previsto (em vez de crescerem juntos) — deixa visível qual linha está "na
+       frente" durante a animação, em vez das duas aparecerem coladas. */
+    var uid = Date.now();
+    var clipPrevId = 'pl-curve-reveal-prev-' + uid;
+    var clipRealId = 'pl-curve-reveal-real-' + uid;
+    svgParts.push('<clipPath id="'+clipPrevId+'"><rect id="pl-curve-reveal-prev-rect" x="0" y="0" width="0" height="'+H+'"/></clipPath>');
+    svgParts.push('<clipPath id="'+clipRealId+'"><rect id="pl-curve-reveal-real-rect" x="0" y="0" width="0" height="'+H+'"/></clipPath>');
+    var gPrev = ['<g clip-path="url(#'+clipPrevId+')">'];
+    gPrev.push('<path d="'+previstoPath+'" fill="none" stroke="var(--pl-curve-prev)" stroke-width="2.5" stroke-dasharray="7 5"/>');
+    gPrev.push('</g>');
+    var gReal = ['<g clip-path="url(#'+clipRealId+')">'];
     if(lastReal >= 0){
-      g.push('<path d="'+realPath+' L '+x(lastReal).toFixed(1)+' '+bottom+' L '+padL+' '+bottom+' Z" fill="var(--primary)" fill-opacity=".08"/>');
+      gReal.push('<path d="'+realPath+' L '+x(lastReal).toFixed(1)+' '+bottom+' L '+padL+' '+bottom+' Z" fill="var(--pl-curve-real)" fill-opacity=".1"/>');
     }
-    g.push('<path d="'+previstoPath+'" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="5 4"/>');
-    if(realPath) g.push('<path d="'+realPath+'" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round"/>');
+    if(realPath) gReal.push('<path d="'+realPath+'" fill="none" stroke="var(--pl-curve-real)" stroke-width="3" stroke-linecap="round"/>');
     if(lastReal >= 0){
       var todayX = x(lastReal);
-      g.push('<line x1="'+todayX.toFixed(1)+'" y1="'+top+'" x2="'+todayX.toFixed(1)+'" y2="'+bottom+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>');
-      g.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.previsto[lastReal]).toFixed(1)+'" r="4" fill="var(--surface)" stroke="var(--ink-faint)" stroke-width="2"/>');
-      g.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.real[lastReal]).toFixed(1)+'" r="4.5" fill="var(--primary)"/>');
-      g.push('<g fill="var(--ink)" font-size="11"><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.previsto[lastReal])-6).toFixed(1)+'">'+fmtPct(data.previsto[lastReal])+'% previsto</text><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.real[lastReal])+18).toFixed(1)+'" font-weight="700" fill="var(--primary)">'+fmtPct(data.real[lastReal])+'% real</text></g>');
+      gReal.push('<line x1="'+todayX.toFixed(1)+'" y1="'+top+'" x2="'+todayX.toFixed(1)+'" y2="'+bottom+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>');
+      gReal.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.previsto[lastReal]).toFixed(1)+'" r="4" fill="var(--surface)" stroke="var(--pl-curve-prev)" stroke-width="2"/>');
+      gReal.push('<circle cx="'+todayX.toFixed(1)+'" cy="'+y(data.real[lastReal]).toFixed(1)+'" r="4.5" fill="var(--pl-curve-real)"/>');
+      gReal.push('<g fill="var(--ink)" font-size="11"><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.previsto[lastReal])-6).toFixed(1)+'">'+fmtPct(data.previsto[lastReal])+'% previsto</text><text x="'+(todayX+8).toFixed(1)+'" y="'+(y(data.real[lastReal])+18).toFixed(1)+'" font-weight="700" fill="var(--pl-curve-real)">'+fmtPct(data.real[lastReal])+'% real</text></g>');
     }
-    g.push('</g>');
-    svgParts.push(g.join(''));
+    gReal.push('</g>');
+    svgParts.push(gPrev.join(''));
+    svgParts.push(gReal.join(''));
     svg.innerHTML = svgParts.join('');
 
-    animateCurveReveal(document.getElementById('pl-curve-reveal-rect'), W - padR, H);
+    animateCurveReveal(document.getElementById('pl-curve-reveal-prev-rect'), document.getElementById('pl-curve-reveal-real-rect'), W - padR, H);
     var scroller = svg.closest('.pl-curve-scroll');
     if(scroller && lastReal >= 0) scroller.scrollLeft = Math.max(0, x(lastReal) - scroller.clientWidth * 0.6);
     return lastReal;
   }
 
-  function animateCurveReveal(rectEl, toWidth, fullHeight){
-    if(!rectEl) return;
-    var duration = Math.min(2200, Math.max(700, toWidth * 0.9));
+  function animateCurveReveal(prevRectEl, realRectEl, toWidth, fullHeight){
+    if(!prevRectEl) return;
+    /* Previsto sai na frente; Real só começa a desenhar depois que Previsto já
+       avançou uma boa parte do caminho, e termina por último — dá pra ver
+       claramente uma linha correndo atrás da outra, em vez das duas surgindo
+       juntas. Duração bem mais lenta que antes (era no máximo ~2.2s). */
+    var durationPrev = Math.min(4200, Math.max(1800, toWidth * 2.6));
+    var delayReal = durationPrev * 0.45;
+    var durationReal = durationPrev * 0.95;
     var start = null;
     function ease(t){ return 1 - Math.pow(1 - t, 3); }
     function step(ts){
       if(start === null) start = ts;
-      var p = Math.min(1, (ts - start) / duration);
-      rectEl.setAttribute('width', (toWidth * ease(p)).toFixed(1));
-      rectEl.setAttribute('height', fullHeight);
-      if(p < 1) requestAnimationFrame(step);
+      var elapsed = ts - start;
+      var pPrev = Math.min(1, elapsed / durationPrev);
+      prevRectEl.setAttribute('width', (toWidth * ease(pPrev)).toFixed(1));
+      prevRectEl.setAttribute('height', fullHeight);
+      if(realRectEl){
+        var pReal = Math.max(0, Math.min(1, (elapsed - delayReal) / durationReal));
+        realRectEl.setAttribute('width', (toWidth * ease(pReal)).toFixed(1));
+        realRectEl.setAttribute('height', fullHeight);
+      }
+      if(pPrev < 1 || (realRectEl && elapsed < delayReal + durationReal)) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
   }
