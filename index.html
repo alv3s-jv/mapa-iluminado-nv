@@ -2116,8 +2116,24 @@ sb.auth.getSession().then(function(res){
 
   function fmtPct(n){ return (n==null?0:n).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
   function fmtDateBR(iso){ if(!iso) return '–'; var p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
-  function colorFor(delta){ return delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)'; }
-  function statusClassFor(delta){ return delta >= -2 ? 'ok' : delta >= -8 ? 'warn' : ''; }
+  function colorFor(delta, deltaRaw){
+    /* delta = desvio relativo ao peso da própria área (dá espalhamento real de cor
+       em vez de tudo ficar sempre perto de zero); deltaRaw, quando informado, é o
+       número efetivamente exibido ao lado do selo -- garante que a cor nunca
+       contradiga o sinal do que está escrito (ex.: um "-0,1%" nunca aparece com
+       fundo verde só porque, relativo ao ritmo da própria área, ainda está dentro
+       da tolerância). */
+    if(deltaRaw != null && deltaRaw < -0.05 && delta >= -2) return 'var(--pl-warn)';
+    return delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
+  }
+  function statusClassFor(delta, deltaRaw){
+    if(deltaRaw != null && deltaRaw < -0.05 && delta >= -2) return 'warn';
+    return delta >= -2 ? 'ok' : delta >= -8 ? 'warn' : '';
+  }
+  function statusLabelFor(delta, deltaRaw){
+    if(deltaRaw != null && deltaRaw < -0.05 && delta >= -2) return 'Atenção';
+    return delta >= -2 ? 'No prazo' : delta >= -8 ? 'Atenção' : 'Atrasado';
+  }
 
   /* ---------- 3. leitura dos dados reais (snapshot atual) ---------- */
   async function fetchCurrentSnapshot(){
@@ -2361,7 +2377,7 @@ sb.auth.getSession().then(function(res){
     if(list.length === 0){ grid.innerHTML = '<p style="color:var(--ink-faint);font-size:13px">Sem áreas nesse filtro.</p>'; return; }
     grid.innerHTML = list.map(function(a, i){
       var deltaVisual = a.barReal - a.barPrevisto;
-      var color = colorFor(deltaVisual);
+      var color = colorFor(deltaVisual, a.desvio);
       var deltaLabel = Math.abs(a.desvio) < 0.05 ? '0,0%' : (a.desvio > 0 ? '+' : '−') + fmtPct(Math.abs(a.desvio)) + '%';
       var selected = plState.areaSelecionada === a.nome;
       var w = Math.max(0,Math.min(100,a.barReal)), l = Math.max(0,Math.min(100,a.barPrevisto));
@@ -2430,12 +2446,12 @@ sb.auth.getSession().then(function(res){
     document.getElementById('pl-delta-pct').innerHTML = (delta>0?'+':delta<0?'−':'') + fmtPct(Math.abs(delta)) + '<small>%</small>';
     document.getElementById('pl-delta-note').textContent = delta > 0.05 ? 'avanço real à frente do previsto' : delta < -0.05 ? 'avanço real atrás do previsto' : 'avanço real alinhado ao previsto';
     var card = document.getElementById('pl-delta-card'), tag = document.getElementById('pl-status-tag');
-    var cls = statusClassFor(colorDelta);
-    var col = colorDelta >= -2 ? 'var(--pl-ok)' : colorDelta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
+    var cls = statusClassFor(colorDelta, delta);
+    var col = colorFor(colorDelta, delta);
     card.style.borderColor = col;
     card.querySelector('.pl-big').style.color = col;
     tag.className = 'pl-status-tag ' + cls;
-    tag.textContent = colorDelta >= -2 ? 'No prazo' : colorDelta >= -8 ? 'Atenção' : 'Atrasado';
+    tag.textContent = statusLabelFor(colorDelta, delta);
   }
 
   function renderEmptyState(msg){
