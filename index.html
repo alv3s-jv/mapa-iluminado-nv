@@ -2133,6 +2133,24 @@ sb.auth.getSession().then(function(res){
   }
 
   /* ---------- 4. cálculos derivados (curva total semanal, % por área, atrasos) ---------- */
+  function resolveCorteEfetivo(curva, corte){
+    /* Sempre avalia em relação à última semana já concluída: data_corte vem bruta
+       da planilha (célula "Data de Corte") e pode cair no início/meio de uma semana
+       ainda em andamento -- ex.: corte = início da semana corrente, semana ainda
+       não fechou. Buscamos o semana_fim da última semana cujo fim já passou
+       (semana_fim <= corte) e usamos esse valor como corte efetivo. Como as
+       semanas são blocos contínuos de 7 dias, testar semana_inicio <= corteEfetivo
+       (código existente em computeAreas/computeCurvaTotal, sem alterações) resulta
+       exatamente no mesmo conjunto de semanas que testar semana_fim <= corte
+       produziria -- ou seja, a semana em andamento fica de fora. */
+    var fimMax = null;
+    curva.forEach(function(r){
+      if(!r.semana_fim || r.semana_fim > corte) return;
+      if(fimMax === null || r.semana_fim > fimMax) fimMax = r.semana_fim;
+    });
+    return fimMax || corte;
+  }
+
   function computeCurvaTotal(curva, corte, area){
     /* Resolução semanal (uma coluna por semana da PPD, igual ao modelo da planilha:
        número da semana na régua de cima, nome do mês agrupando várias semanas embaixo)
@@ -2515,7 +2533,7 @@ sb.auth.getSession().then(function(res){
      carregados -- só recalcula e re-renderiza, sem nova consulta ao Supabase. */
   function applyAreaSelection(){
     if(!plState.snapData || !plState.snapData.snap) return;
-    var corte = plState.snapData.snap.data_corte;
+    var corte = plState.corteEfetivo || plState.snapData.snap.data_corte;
     var derived = computeDerived(plState.snapData, corte, plState.areaSelecionada);
     plState.derived = derived;
     renderDerivedViews(derived);
@@ -2542,12 +2560,14 @@ sb.auth.getSession().then(function(res){
     plState.snapData = result;
     plState.areaSelecionada = null;
     var corte = result.snap.data_corte;
-    var derived = computeDerived(result, corte, plState.areaSelecionada);
+    var corteEfetivo = resolveCorteEfetivo(result.curva, corte);
+    plState.corteEfetivo = corteEfetivo;
+    var derived = computeDerived(result, corteEfetivo, plState.areaSelecionada);
     plState.derived = derived;
 
     document.getElementById('pl-rev').textContent = result.snap.revisao;
     document.getElementById('pl-rev-2').textContent = result.snap.revisao;
-    document.getElementById('pl-updated-at').textContent = fmtDateBR(corte);
+    document.getElementById('pl-updated-at').textContent = fmtDateBR(corteEfetivo);
 
     renderDerivedViews(derived);
     plState.loaded = true;
