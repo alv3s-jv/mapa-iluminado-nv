@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=5">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -139,7 +139,7 @@
   --border:#d4d4d7; --border-strong:#1d1f20;
   --primary:#0f3d5f; --primary-ink:#ffffff; --primary-tint:#eef6ff;
   --pl-curve-prev:#8a8478; --pl-curve-real:#1a5ea3;
-  --accent:#e2740e; --accent-deep:#c86408; --accent-ink:#ffffff;
+  --accent:#e2740e; --accent-deep:#c86408; --accent-ink:#ffffff; --accent-text:#b75e0b;
   --status-done:#158a3e; --status-done-fill:#158a3e; --status-done-edge:#0f6a2f;
   --status-progress:#5980a6; --status-progress-deep:#416180;
   --status-none:#b7b7ba; --status-none-ink:#5d5d60;
@@ -210,7 +210,7 @@ a{color:var(--primary)} a:hover{color:var(--accent)}
 .btn:hover{background:var(--primary-tint)}
 .btn:active{background:var(--surface-2)}
 .btn svg{flex:none}
-.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-primary{background:var(--accent-text);border-color:var(--accent-text);color:var(--accent-ink)}
 .btn-primary:hover{background:var(--accent-deep);border-color:var(--accent-deep)}
 .btn-icon{width:40px;height:40px;padding:0;border-color:var(--border-strong);color:var(--primary);background:var(--surface)}
 .logout-link{font-size:13px;color:var(--primary);cursor:pointer;text-decoration:none;background:none;border:none;font-family:inherit;padding:0 4px}
@@ -401,9 +401,9 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .login-card label{display:block;font-size:12px;color:var(--ink-muted);margin:0 0 5px}
 .login-card .field-head{display:flex;justify-content:space-between;align-items:baseline}
 .login-card .field-head a{font-size:12px;text-decoration:none}
-.login-card input:not([type=checkbox]){width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--ink-faint);background:var(--surface);color:var(--ink);font-family:inherit;font-size:15px;border-radius:0}
+.login-card input:not([type=checkbox]){width:100%;min-height:44px;padding:8px 12px;border:1px solid var(--ink-faint);background:var(--surface);color:var(--ink);font-family:inherit;font-size:16px;border-radius:0}
 .login-card input:focus{outline:none;border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary)}
-.login-card button[type=submit],#update-submit{width:100%;min-height:48px;margin-top:8px;border:none;background:var(--accent);color:var(--accent-ink);font-family:var(--font-head);font-weight:600;font-size:17px;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:background-color .15s;border-radius:0}
+.login-card button[type=submit],#update-submit{width:100%;min-height:48px;margin-top:8px;border:none;background:var(--accent-text);color:var(--accent-ink);font-family:var(--font-head);font-weight:600;font-size:17px;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:background-color .15s;border-radius:0}
 .login-card button[type=submit]:hover,#update-submit:hover{background:var(--accent-deep)}
 .login-card button:disabled{opacity:.6;cursor:default}
 .login-foot{font-size:12px;color:var(--ink-faint)}
@@ -456,7 +456,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 
 /* ================= ABA PLANEJAMENTO — tokens próprios sobre os já existentes ================= */
 :root{
-  --pl-ok:#158a3e; --pl-warn:#c9820a; --pl-late:#b3261e;
+  --pl-ok:#158a3e; --pl-warn:#c9820a; --pl-late:#b3261e; --pl-ok-text:#14863c; --pl-warn-text:#a26908;
 }
 
 /* top-level tabs (Mapa iluminado / Planejamento) — troca a barra .tabs existente por esta, um nível acima */
@@ -470,6 +470,9 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;
   padding:20px calc(24px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
   display:flex;flex-direction:column;gap:20px}
+@media (max-width:720px){
+  .pl-scroll{padding-left:calc(14px + env(safe-area-inset-left));padding-right:calc(14px + env(safe-area-inset-right))}
+}
 
 .pl-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .pl-head-title{display:flex;flex-direction:column;gap:4px}
@@ -506,8 +509,8 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-summary-card-alert .pl-big{color:var(--pl-late)}
 .pl-delta-inner{display:flex;flex-direction:column}
 .pl-status-tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-head);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--pl-late);padding:6px 10px;white-space:nowrap}
-.pl-status-tag.warn{background:var(--pl-warn)}
-.pl-status-tag.ok{background:var(--pl-ok)}
+.pl-status-tag.warn{background:var(--pl-warn-text)}
+.pl-status-tag.ok{background:var(--pl-ok-text)}
 
 .pl-areas-block{display:flex;flex-direction:column;gap:10px}
 .pl-areas-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
@@ -521,6 +524,10 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-seg button{height:32px;padding:0 12px;border:0;border-left:1px solid var(--border);font-family:var(--font-body);font-size:12px;cursor:pointer;background:var(--surface);color:var(--ink-muted)}
 .pl-seg button:first-child{border-left:0}
 .pl-seg button.active{background:var(--primary);color:#fff}
+@media (max-width:720px){
+  .pl-seg{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  .pl-seg button{height:44px;white-space:nowrap;flex:none}
+}
 
 .pl-area-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 @media (max-width:1100px){.pl-area-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -538,7 +545,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-area-bar{position:relative;height:6px;background:var(--surface-2)}
 .pl-area-bar-fill{position:absolute;left:0;top:0;height:100%;transition:width .7s cubic-bezier(.22,.61,.36,1)}
 .pl-area-bar-mark{position:absolute;top:-3px;width:2px;height:12px;background:var(--ink);transition:left .7s cubic-bezier(.22,.61,.36,1)}
-.pl-area-clear-btn{margin-left:6px;font-size:11px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--accent);padding:1px 6px;cursor:pointer;border-radius:2px}
+.pl-area-clear-btn{margin-left:6px;font-size:11px;font-weight:600;color:var(--accent-text);background:none;border:1px solid var(--accent-text);padding:1px 6px;cursor:pointer;border-radius:2px}
 .pl-area-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:var(--ink-muted)}
 .pl-area-nums .r{text-align:right}
 .pl-area-nums b{display:block;font-family:var(--font-head);font-weight:600;font-size:18px;line-height:1.1;color:var(--ink-muted)}
@@ -551,8 +558,14 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-table tr:hover td{background:var(--surface-2)}
 .pl-col-rank{width:32px}.pl-col-mae{width:150px}
 .pl-t-rank{color:var(--ink-faint);font-variant-numeric:tabular-nums}
-.pl-t-name{font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.pl-t-name{font-weight:500;color:var(--ink);max-width:0}
+.pl-t-name-main{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pl-t-mae{color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.pl-t-mae-sub{display:none;font-size:10px;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+@media (max-width:720px){
+  .pl-col-mae,.pl-t-mae{display:none}
+  .pl-t-mae-sub{display:block}
+}
 
 .pl-negpos-block{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);padding:14px 18px 6px}
 .pl-skeleton{display:flex;flex-direction:column;gap:16px}
@@ -576,7 +589,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 
 
 /* modal de upload da PPD — reaproveita a base visual de #update-card/#update-submit */
-#pl-submit{width:100%;min-height:48px;margin-top:8px;border:none;background:var(--accent);color:var(--accent-ink);font-family:var(--font-head);font-weight:600;font-size:17px;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:background-color .15s;border-radius:0}
+#pl-submit{width:100%;min-height:48px;margin-top:8px;border:none;background:var(--accent-text);color:var(--accent-ink);font-family:var(--font-head);font-weight:600;font-size:17px;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:background-color .15s;border-radius:0}
 #pl-submit:hover{background:var(--accent-deep)}
 #pl-submit:disabled{opacity:.5;cursor:default}
 </style>
@@ -2122,8 +2135,8 @@ sb.auth.getSession().then(function(res){
        contradiga o sinal do que está escrito (ex.: um "-0,1%" nunca aparece com
        fundo verde só porque, relativo ao ritmo da própria área, ainda está dentro
        da tolerância). */
-    if(deltaRaw != null && deltaRaw < -0.05 && delta >= -2) return 'var(--pl-warn)';
-    return delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
+    if(deltaRaw != null && deltaRaw < -0.05 && delta >= -2) return 'var(--pl-warn-text)';
+    return delta >= -2 ? 'var(--pl-ok-text)' : delta >= -8 ? 'var(--pl-warn-text)' : 'var(--pl-late)';
   }
   function statusClassFor(delta, deltaRaw){
     if(deltaRaw != null && deltaRaw < -0.05 && delta >= -2) return 'warn';
@@ -2408,11 +2421,11 @@ sb.auth.getSession().then(function(res){
         return;
       }
       body.innerHTML = list.map(function(r,i){
-        var color = r.delta < 0 ? 'var(--pl-late)' : r.delta > 0 ? 'var(--pl-ok)' : 'var(--ink-muted)';
+        var color = r.delta < 0 ? 'var(--pl-late)' : r.delta > 0 ? 'var(--pl-ok-text)' : 'var(--ink-muted)';
         var sign = r.delta > 0 ? '+' : (r.delta < 0 ? '−' : '');
         return '<tr>' +
           '<td class="pl-t-rank">'+String(i+1).padStart(2,'0')+'</td>' +
-          '<td class="pl-t-name" title="'+r.nome+'">'+r.nome+'</td>' +
+          '<td class="pl-t-name" title="'+r.nome+'"><span class="pl-t-name-main">'+r.nome+'</span><span class="pl-t-mae-sub">'+r.mae+'</span></td>' +
           '<td class="pl-t-mae" title="'+r.mae+'">'+r.mae+'</td>' +
           '<td class="pl-t-delta" style="color:'+color+'">'+sign+fmtPct(Math.abs(r.delta))+'%</td>' +
         '</tr>';
@@ -2830,7 +2843,7 @@ sb.auth.getSession().then(function(res){
         parsedResult = plParsePPD(wb, file.name);
         statusEl.textContent = '"' + file.name + '" lido com sucesso.';
         var warnHtml = parsedResult.warnings.length
-          ? '<p style="color:var(--pl-warn);margin-top:6px">⚠ ' + parsedResult.warnings.join('<br>⚠ ') + '</p>'
+          ? '<p style="color:var(--pl-warn-text);margin-top:6px">⚠ ' + parsedResult.warnings.join('<br>⚠ ') + '</p>'
           : '';
         preview.hidden = false;
         preview.innerHTML =
