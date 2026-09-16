@@ -525,15 +525,20 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-area-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 @media (max-width:1100px){.pl-area-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:720px){.pl-area-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.pl-area-card{background:var(--surface);border:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.pl-area-card{background:var(--surface);border:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer;transition:border-color .2s,box-shadow .2s;animation:pl-card-in .4s ease both}
+.pl-area-card:hover{border-color:var(--primary)}
+.pl-area-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.pl-area-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@keyframes pl-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .pl-area-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .pl-area-name{display:flex;flex-direction:column;line-height:1.15}
 .pl-area-name b{font-family:var(--font-head);font-weight:600;font-size:18px;color:var(--primary)}
 .pl-area-name span{font-size:11px;color:var(--ink-faint)}
 .pl-area-delta{font-family:var(--font-head);font-weight:600;font-size:13px;white-space:nowrap;padding:2px 6px;color:#fff}
 .pl-area-bar{position:relative;height:6px;background:var(--surface-2)}
-.pl-area-bar-fill{position:absolute;left:0;top:0;height:100%}
-.pl-area-bar-mark{position:absolute;top:-3px;width:2px;height:12px;background:var(--ink)}
+.pl-area-bar-fill{position:absolute;left:0;top:0;height:100%;transition:width .7s cubic-bezier(.22,.61,.36,1)}
+.pl-area-bar-mark{position:absolute;top:-3px;width:2px;height:12px;background:var(--ink);transition:left .7s cubic-bezier(.22,.61,.36,1)}
+.pl-area-clear-btn{margin-left:6px;font-size:11px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--accent);padding:1px 6px;cursor:pointer;border-radius:2px}
 .pl-area-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:var(--ink-muted)}
 .pl-area-nums .r{text-align:right}
 .pl-area-nums b{display:block;font-family:var(--font-head);font-weight:600;font-size:18px;line-height:1.1;color:var(--ink-muted)}
@@ -755,7 +760,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
       <div class="pl-top-grid">
         <div class="pl-curve-card">
           <div class="pl-curve-head">
-            <span class="eyebrow">Curva S — avanço acumulado do projeto</span>
+            <span class="eyebrow" id="pl-curve-eyebrow">Curva S — avanço acumulado do projeto</span>
             <div class="pl-curve-legend">
               <span><i class="pl-lg pl-lg-dash"></i>Previsto</span>
               <span><i class="pl-lg pl-lg-solid"></i>Real</span>
@@ -2097,7 +2102,7 @@ sb.auth.getSession().then(function(res){
   var MESES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
   var MESES_PT_CAP = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-  var plState = { filtro: 'Todas', ordenar: 'peso', loaded: false, snapData: null, derived: null };
+  var plState = { filtro: 'Todas', ordenar: 'peso', loaded: false, snapData: null, derived: null, areaSelecionada: null };
 
   function fmtPct(n){ return (n==null?0:n).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
   function fmtDateBR(iso){ if(!iso) return '–'; var p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
@@ -2118,13 +2123,18 @@ sb.auth.getSession().then(function(res){
   }
 
   /* ---------- 4. cálculos derivados (curva total semanal, % por área, atrasos) ---------- */
-  function computeCurvaTotal(curva, corte){
+  function computeCurvaTotal(curva, corte, area){
     /* Resolução semanal (uma coluna por semana da PPD, igual ao modelo da planilha:
        número da semana na régua de cima, nome do mês agrupando várias semanas embaixo)
        em vez de um ponto por mês — evita rótulo de mês repetido/ambíguo em projetos
-       com mais de 12 meses e reproduz o mesmo "S" que a planilha mostra semana a semana. */
+       com mais de 12 meses e reproduz o mesmo "S" que a planilha mostra semana a semana.
+       Quando "area" é informado (card de área clicado), filtra só as linhas daquela
+       área — os valores continuam brutos (mesma unidade da planilha), então a curva
+       de uma área pequena no projeto todo fica baixa no eixo — é o mesmo comportamento
+       do filtro Y27 da aba "Curva - S" na planilha. */
+    var rows = area ? curva.filter(function(r){ return r.local === area; }) : curva;
     var weekMap = {};
-    curva.forEach(function(r){
+    rows.forEach(function(r){
       if(!r.semana_inicio || r.semana_num == null) return;
       var key = r.ano + '-W' + String(r.semana_num).padStart(2,'0');
       if(!weekMap[key]) weekMap[key] = { previsto:0, real:0, semana_inicio:r.semana_inicio, semana_num:r.semana_num };
@@ -2181,10 +2191,10 @@ sb.auth.getSession().then(function(res){
      − avanço previsto); esse valor bruto é então multiplicado pelo fator de correção
      do replanejamento (BD.Dados!CK17/CG17) e ranqueado — LARGE/SMALL dos 10 maiores
      e 10 menores, sem filtrar por sinal (igual à planilha). */
-  function computeTopDeltas(atividades, fator){
+  function computeTopDeltas(atividades, fator, area){
     var f = (typeof fator === 'number' && isFinite(fator) && fator !== 0) ? fator : 1;
     var rows = atividades
-      .filter(function(t){ return t.peso_unitario != null && t.avanco_previsto != null && t.avanco_real != null; })
+      .filter(function(t){ return t.peso_unitario != null && t.avanco_previsto != null && t.avanco_real != null && (!area || t.local === area); })
       .map(function(t){
         var deltaRaw = (Number(t.peso_unitario)||0) * ((Number(t.avanco_real)||0) - (Number(t.avanco_previsto)||0));
         return { nome: t.nome_tarefa, mae: t.atividade_mae || '—', peso: (Number(t.peso_unitario)||0) * 100, delta: deltaRaw * f * 100 };
@@ -2193,11 +2203,11 @@ sb.auth.getSession().then(function(res){
     return { negativos: sorted.slice(0, 10), positivos: sorted.slice(-10).reverse(), fator: f };
   }
 
-  function computeDerived(snapData, corte){
+  function computeDerived(snapData, corte, area){
     return {
-      curvaTotal: computeCurvaTotal(snapData.curva, corte),
+      curvaTotal: computeCurvaTotal(snapData.curva, corte, area),
       areas: computeAreas(snapData.curva, corte),
-      topDeltas: computeTopDeltas(snapData.atividades, snapData.snap ? snapData.snap.fator_correcao : null)
+      topDeltas: computeTopDeltas(snapData.atividades, snapData.snap ? snapData.snap.fator_correcao : null, area)
     };
   }
 
@@ -2321,19 +2331,30 @@ sb.auth.getSession().then(function(res){
     var grid = document.getElementById('pl-area-grid');
     var list = areas.filter(function(a){ return plState.filtro === 'Todas' || a.grupo === plState.filtro; });
     if(list.length === 0){ grid.innerHTML = '<p style="color:var(--ink-faint);font-size:13px">Sem áreas nesse filtro.</p>'; return; }
-    grid.innerHTML = list.map(function(a){
+    grid.innerHTML = list.map(function(a, i){
       var deltaVisual = a.barReal - a.barPrevisto;
       var color = colorFor(deltaVisual);
       var deltaLabel = Math.abs(a.desvio) < 0.05 ? '0,0%' : (a.desvio > 0 ? '+' : '−') + fmtPct(Math.abs(a.desvio)) + '%';
-      return '<div class="pl-area-card">' +
+      var selected = plState.areaSelecionada === a.nome;
+      var w = Math.max(0,Math.min(100,a.barReal)), l = Math.max(0,Math.min(100,a.barPrevisto));
+      return '<div class="pl-area-card'+(selected?' selected':'')+'" data-area="'+a.nome+'" role="button" tabindex="0" aria-pressed="'+selected+'" style="animation-delay:'+Math.min(i*40,320)+'ms">' +
         '<div class="pl-area-card-head"><div class="pl-area-name"><b>'+a.nome+'</b><span>'+a.sub+'</span></div>' +
         '<span class="pl-area-delta" style="background:'+color+'" title="Desvio acumulado (igual a planilha)">'+deltaLabel+'</span></div>' +
-        '<div class="pl-area-bar"><div class="pl-area-bar-fill" style="background:'+color+';width:'+Math.max(0,Math.min(100,a.barReal))+'%"></div>' +
-        '<div class="pl-area-bar-mark" style="left:calc('+Math.max(0,Math.min(100,a.barPrevisto))+'% - 1px)"></div></div>' +
+        '<div class="pl-area-bar"><div class="pl-area-bar-fill" data-w="'+w+'" style="background:'+color+';width:0%"></div>' +
+        '<div class="pl-area-bar-mark" data-l="'+l+'" style="left:calc(0% - 1px)"></div></div>' +
         '<div class="pl-area-nums"><div><span>Previsto</span><b>'+fmtPct(a.previsto)+'<small>%</small></b></div>' +
         '<div class="r"><span>Real</span><b>'+fmtPct(a.real)+'<small>%</small></b></div></div>' +
       '</div>';
     }).join('');
+    /* dispara a transicao de width/left apos o primeiro paint (elemento novo,
+       criado via innerHTML, comeca em 0 pra barra "crescer" -- igual ao espirito
+       da animacao da Curva S, so que via CSS transition em vez de rAF manual). */
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        grid.querySelectorAll('.pl-area-bar-fill').forEach(function(el){ el.style.width = el.dataset.w + '%'; });
+        grid.querySelectorAll('.pl-area-bar-mark').forEach(function(el){ el.style.left = 'calc(' + el.dataset.l + '% - 1px)'; });
+      });
+    });
   }
 
   function renderTopDeltas(topDeltas){
@@ -2360,7 +2381,7 @@ sb.auth.getSession().then(function(res){
     if(fatorEl) fatorEl.textContent = topDeltas.fator.toLocaleString('pt-BR', {minimumFractionDigits:4, maximumFractionDigits:4});
   }
 
-  function renderSummary(curvaTotal, lastReal){
+  function renderSummary(curvaTotal, lastReal, areaMeta){
     if(lastReal < 0){
       document.getElementById('pl-prev-pct').innerHTML = '–<small>%</small>';
       document.getElementById('pl-real-pct').innerHTML = '–<small>%</small>';
@@ -2371,17 +2392,22 @@ sb.auth.getSession().then(function(res){
     }
     var prev = curvaTotal.previsto[lastReal], real = curvaTotal.real[lastReal];
     var delta = real - prev;
+    /* Classificação (cor/tag) usa o desvio relativo ao peso da própria área quando
+       filtrado por área -- senão áreas de peso pequeno no projeto todo nunca disparariam
+       "atrasado" no valor bruto exibido (que bate com a planilha, mas fica sempre
+       pequeno em módulo). */
+    var colorDelta = areaMeta ? (areaMeta.barReal - areaMeta.barPrevisto) : delta;
     document.getElementById('pl-prev-pct').innerHTML = fmtPct(prev) + '<small>%</small>';
     document.getElementById('pl-real-pct').innerHTML = fmtPct(real) + '<small>%</small>';
     document.getElementById('pl-delta-pct').innerHTML = (delta>0?'+':delta<0?'−':'') + fmtPct(Math.abs(delta)) + '<small>%</small>';
     document.getElementById('pl-delta-note').textContent = delta > 0.05 ? 'avanço real à frente do previsto' : delta < -0.05 ? 'avanço real atrás do previsto' : 'avanço real alinhado ao previsto';
     var card = document.getElementById('pl-delta-card'), tag = document.getElementById('pl-status-tag');
-    var cls = statusClassFor(delta);
-    var col = delta >= -2 ? 'var(--pl-ok)' : delta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
+    var cls = statusClassFor(colorDelta);
+    var col = colorDelta >= -2 ? 'var(--pl-ok)' : colorDelta >= -8 ? 'var(--pl-warn)' : 'var(--pl-late)';
     card.style.borderColor = col;
     card.querySelector('.pl-big').style.color = col;
     tag.className = 'pl-status-tag ' + cls;
-    tag.textContent = delta >= -2 ? 'No prazo' : delta >= -8 ? 'Atenção' : 'Atrasado';
+    tag.textContent = colorDelta >= -2 ? 'No prazo' : colorDelta >= -8 ? 'Atenção' : 'Atrasado';
   }
 
   function renderEmptyState(msg){
@@ -2409,6 +2435,46 @@ sb.auth.getSession().then(function(res){
     });
   }
 
+  /* Renderiza curva, resumo, cards de área e Top Negativos/Positivos a partir de um
+     "derived" já calculado -- usado tanto na carga inicial quanto ao clicar/limpar
+     o filtro de área (sem refazer fetch, só recalcula em cima do snapshot em memória). */
+  function renderDerivedViews(derived){
+    var lastReal = renderCurva(derived.curvaTotal);
+    var areaMeta = plState.areaSelecionada ? derived.areas.filter(function(a){ return a.nome === plState.areaSelecionada; })[0] : null;
+    renderSummary(derived.curvaTotal, lastReal, areaMeta);
+    renderFilters();
+    renderAreas(derived.areas);
+    renderTopDeltas(derived.topDeltas);
+    renderCurveEyebrow();
+    renderNegposSummary();
+  }
+
+  function renderCurveEyebrow(){
+    var el = document.getElementById('pl-curve-eyebrow');
+    if(!el) return;
+    el.innerHTML = plState.areaSelecionada
+      ? 'Curva S — avanço acumulado · <b>' + plState.areaSelecionada + '</b> <button type="button" class="pl-area-clear-btn">✕ ver projeto todo</button>'
+      : 'Curva S — avanço acumulado do projeto';
+  }
+
+  function renderNegposSummary(){
+    var el = document.getElementById('pl-negpos-summary');
+    if(!el) return;
+    el.innerHTML = plState.areaSelecionada
+      ? 'Δ Avanço × peso, corrigido pelo fator de replanejamento · área: <b>' + plState.areaSelecionada + '</b> <button type="button" class="pl-area-clear-btn">✕ ver todas</button>'
+      : 'Δ Avanço × peso, corrigido pelo fator de replanejamento';
+  }
+
+  /* Reaplica o filtro de área selecionado (clique num card) sobre os dados já
+     carregados -- só recalcula e re-renderiza, sem nova consulta ao Supabase. */
+  function applyAreaSelection(){
+    if(!plState.snapData || !plState.snapData.snap) return;
+    var corte = plState.snapData.snap.data_corte;
+    var derived = computeDerived(plState.snapData, corte, plState.areaSelecionada);
+    plState.derived = derived;
+    renderDerivedViews(derived);
+  }
+
   async function renderPlanejamento(){
     var result = await fetchCurrentSnapshot();
     if(result.error){
@@ -2425,25 +2491,45 @@ sb.auth.getSession().then(function(res){
     }
     clearEmptyState();
     plState.snapData = result;
+    plState.areaSelecionada = null;
     var corte = result.snap.data_corte;
-    var derived = computeDerived(result, corte);
+    var derived = computeDerived(result, corte, plState.areaSelecionada);
     plState.derived = derived;
 
     document.getElementById('pl-rev').textContent = result.snap.revisao;
     document.getElementById('pl-rev-2').textContent = result.snap.revisao;
     document.getElementById('pl-updated-at').textContent = fmtDateBR(corte);
 
-    var lastReal = renderCurva(derived.curvaTotal);
-    renderSummary(derived.curvaTotal, lastReal);
-    renderFilters();
-    renderAreas(derived.areas);
-    renderTopDeltas(derived.topDeltas);
+    renderDerivedViews(derived);
     plState.loaded = true;
   }
 
   document.getElementById('pl-area-filters').addEventListener('click', function(e){
     var btn = e.target.closest('button'); if(!btn || !plState.derived) return;
     plState.filtro = btn.dataset.g; renderFilters(); renderAreas(plState.derived.areas);
+  });
+
+  /* Clicar num card de área filtra a Curva S e o Top Negativos/Positivos para
+     aquela área (clicar de novo no mesmo card limpa o filtro). */
+  document.getElementById('pl-area-grid').addEventListener('click', function(e){
+    var card = e.target.closest('.pl-area-card'); if(!card || !plState.derived) return;
+    var area = card.dataset.area;
+    plState.areaSelecionada = (plState.areaSelecionada === area) ? null : area;
+    applyAreaSelection();
+  });
+  document.getElementById('pl-area-grid').addEventListener('keydown', function(e){
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    var card = e.target.closest('.pl-area-card'); if(!card || !plState.derived) return;
+    e.preventDefault();
+    var area = card.dataset.area;
+    plState.areaSelecionada = (plState.areaSelecionada === area) ? null : area;
+    applyAreaSelection();
+  });
+  document.addEventListener('click', function(e){
+    if(e.target.closest('.pl-area-clear-btn')){
+      plState.areaSelecionada = null;
+      applyAreaSelection();
+    }
   });
 
   /* ================= 6. upload / importação da planilha PPD ================= */
