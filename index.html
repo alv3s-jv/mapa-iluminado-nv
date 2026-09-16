@@ -541,10 +541,10 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
 .pl-table th{text-align:left;font-weight:500;font-size:11px;color:var(--ink-muted);padding:4px 0 6px;border-bottom:1px solid var(--border)}
 .pl-table td{padding:9px 0;border-bottom:1px solid var(--surface-2);vertical-align:middle}
 .pl-table tr:hover td{background:var(--surface-2)}
-.pl-col-rank{width:32px}.pl-col-area{width:110px}
+.pl-col-rank{width:32px}.pl-col-mae{width:150px}
 .pl-t-rank{color:var(--ink-faint);font-variant-numeric:tabular-nums}
-.pl-t-name{font-weight:500;color:var(--ink)}
-.pl-t-area{color:var(--ink-muted)}
+.pl-t-name{font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.pl-t-mae{color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
 
 .pl-negpos-block{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);padding:14px 18px 6px}
 .pl-negpos-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
@@ -810,7 +810,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-late)"></i>Top 10 Negativos</div>
             <table class="pl-table">
               <thead><tr>
-                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-delta">Δ corrigido</th>
+                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-mae">Atividade Mãe</th><th class="pl-col-delta">Desvio</th>
               </tr></thead>
               <tbody id="pl-neg-body"></tbody>
             </table>
@@ -819,13 +819,13 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-ok)"></i>Top 10 Positivos</div>
             <table class="pl-table">
               <thead><tr>
-                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-area">Área</th><th class="pl-col-delta">Δ corrigido</th>
+                <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-mae">Atividade Mãe</th><th class="pl-col-delta">Desvio</th>
               </tr></thead>
               <tbody id="pl-pos-body"></tbody>
             </table>
           </div>
         </div>
-        <div class="pl-table-foot"><span>Δ corrigido = peso unitário × (avanço real − avanço previsto) × fator de correção (<span id="pl-fator-val">–</span>), mesma lógica da aba "Curva - S" da planilha PPD (AD28: Top Positivos/Negativos).</span><span class="pl-tag">dados ilustrativos</span></div>
+        <div class="pl-table-foot"><span>Desvio = peso unitário × (avanço real − avanço previsto) × fator de correção (<span id="pl-fator-val">–</span>), mesma lógica da aba "Curva - S" da planilha PPD (AD28: Top Positivos/Negativos).</span><span class="pl-tag">dados ilustrativos</span></div>
       </div>
 
     </div>
@@ -2176,7 +2176,7 @@ sb.auth.getSession().then(function(res){
       .filter(function(t){ return t.peso_unitario != null && t.avanco_previsto != null && t.avanco_real != null; })
       .map(function(t){
         var deltaRaw = (Number(t.peso_unitario)||0) * ((Number(t.avanco_real)||0) - (Number(t.avanco_previsto)||0));
-        return { nome: t.nome_tarefa, area: t.local, peso: (Number(t.peso_unitario)||0) * 100, delta: deltaRaw * f * 100 };
+        return { nome: t.nome_tarefa, mae: t.atividade_mae || '—', peso: (Number(t.peso_unitario)||0) * 100, delta: deltaRaw * f * 100 };
       });
     var sorted = rows.slice().sort(function(a,b){ return a.delta - b.delta; });
     return { negativos: sorted.slice(0, 10), positivos: sorted.slice(-10).reverse(), fator: f };
@@ -2316,8 +2316,8 @@ sb.auth.getSession().then(function(res){
         var sign = r.delta > 0 ? '+' : (r.delta < 0 ? '−' : '');
         return '<tr>' +
           '<td class="pl-t-rank">'+String(i+1).padStart(2,'0')+'</td>' +
-          '<td class="pl-t-name">'+r.nome+'</td>' +
-          '<td class="pl-t-area">'+r.area+'</td>' +
+          '<td class="pl-t-name" title="'+r.nome+'">'+r.nome+'</td>' +
+          '<td class="pl-t-mae" title="'+r.mae+'">'+r.mae+'</td>' +
           '<td class="pl-t-delta" style="color:'+color+'">'+sign+fmtPct(Math.abs(r.delta))+'%</td>' +
         '</tr>';
       }).join('');
@@ -2527,7 +2527,22 @@ sb.auth.getSession().then(function(res){
     var range = XLSX.utils.decode_range(ws['!ref']);
     var maxRow = range.e.r + 1;
     var atividades = [], pesoSum = 0;
+    /* A planilha não tem coluna de "atividade mãe" — o nível hierárquico é dado
+       pela indentação (espaços à esquerda) em Nome da Tarefa. Empilhamos toda
+       linha com nome (inclusive as de grupo, sem LOCAL) e, ao chegar numa
+       linha-folha (LOCAL preenchido), a mãe é o topo da pilha com indentação
+       menor que a da linha atual. */
+    var hierStack = [];
     for(var r = QT_DATA_START_ROW; r <= maxRow; r++){
+      var nomeRaw = plCellVal(ws, r, QT_COL.nome);
+      if(nomeRaw == null || nomeRaw === '') continue;
+      nomeRaw = String(nomeRaw);
+      var indent = nomeRaw.length - nomeRaw.replace(/^ +/, '').length;
+      var nomeTrim = nomeRaw.trim();
+      while(hierStack.length && hierStack[hierStack.length-1].indent >= indent) hierStack.pop();
+      var atividadeMae = hierStack.length ? hierStack[hierStack.length-1].nome : null;
+      hierStack.push({ indent: indent, nome: nomeTrim });
+
       var local = plCellVal(ws, r, QT_COL.local);
       if(local == null || local === '') continue;
       var peso = plNum(plCellVal(ws, r, QT_COL.peso)) || 0;
@@ -2535,7 +2550,8 @@ sb.auth.getSession().then(function(res){
       atividades.push({
         local: String(local).trim(),
         servico: plCellVal(ws, r, QT_COL.servico) || null,
-        nome_tarefa: String(plCellVal(ws, r, QT_COL.nome) || '').trim(),
+        nome_tarefa: nomeTrim,
+        atividade_mae: atividadeMae,
         status: plCellVal(ws, r, QT_COL.status) || null,
         data_inicio_prevista: plExcelDateToISO(plCellVal(ws, r, QT_COL.iniPrev)),
         data_fim_prevista: plExcelDateToISO(plCellVal(ws, r, QT_COL.termPrev)),
