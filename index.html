@@ -2212,7 +2212,7 @@ sb.auth.getSession().then(function(res){
 
   var plState = { filtro: 'Todas', ordenar: 'peso', loaded: false, snapData: null, derived: null, areaSelecionada: null };
 
-  function fmtPct(n){ return (n==null?0:n).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
+  function fmtPct(n){ return (n==null?0:n).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
   function fmtDateBR(iso){ if(!iso) return '–'; var p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
   function colorFor(delta, deltaRaw){
     /* delta = desvio relativo ao peso da própria área (dá espalhamento real de cor
