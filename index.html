@@ -2331,7 +2331,7 @@ sb.auth.getSession().then(function(res){
   /* Top Negativos/Positivos — mesma lógica da aba "Curva - S" (AD28) da planilha:
      %Delta Avanço por atividade (Tabela7, nível folha) = peso_unitario × (avanço real
      − avanço previsto); esse valor bruto é então multiplicado pelo fator de correção
-     do replanejamento (BD.Dados!CK17/CG17) e ranqueado — LARGE/SMALL dos 10 maiores
+     do replanejamento (2 BD_DADOS!CK17/CG17) e ranqueado — LARGE/SMALL dos 10 maiores
      e 10 menores, sem filtrar por sinal (igual à planilha). */
   function computeTopDeltas(atividades, fator, area){
     var f = (typeof fator === 'number' && isFinite(fator) && fator !== 0) ? fator : 1;
@@ -2721,7 +2721,7 @@ sb.auth.getSession().then(function(res){
   var BD_REAL_ROWS = [34, 35, 36, 37, 38, 39, 40, 41, 42, 43];
   var BD_PREV_TOTAL_ROW = 32, BD_REAL_TOTAL_ROW = 45;
   var BD_WEEK_COL_START = 5, BD_ROW_SEMANA_NUM = 8, BD_ROW_SEMANA_LABEL = 9, BD_ROW_SEMANA_INICIO = 10, BD_ROW_SEMANA_FIM = 11, BD_COL_LOCAL = 4;
-  /* Fator de correção do replanejamento — BD.Dados!CK17 / BD.Dados!CG17 (linha "%REV15
+  /* Fator de correção do replanejamento — 2 BD_DADOS!CK17 / 2 BD_DADOS!CG17 (linha "%REV15
      APÓS S34" / "...CORRIGIDO"). Usado para corrigir o %Delta Avanço no Top Negativos/Positivos. */
   var BD_FATOR_ROW = 17, BD_FATOR_CG_COL = 85, BD_FATOR_CK_COL = 89;
   var QT_HEADER_ROW = 10, QT_DATA_START_ROW = 11;
@@ -2762,16 +2762,16 @@ sb.auth.getSession().then(function(res){
   }
 
   function plParseCurva(wb, warnings){
-    var ws = wb.Sheets['BD.Dados'];
-    if(!ws) throw new Error('Aba "BD.Dados" não encontrada no arquivo.');
-    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_NUM, BD_COL_LOCAL), 'Semana', 'BD.Dados!D8');
-    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_INICIO, BD_COL_LOCAL), 'Início', 'BD.Dados!D10');
-    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_FIM, BD_COL_LOCAL), 'Término', 'BD.Dados!D11');
-    plAssertLabel(plCellVal(ws, BD_PREV_TOTAL_ROW, BD_COL_LOCAL), 'UFV Noronha Verde', 'BD.Dados!D' + BD_PREV_TOTAL_ROW);
-    plAssertLabel(plCellVal(ws, BD_REAL_TOTAL_ROW, BD_COL_LOCAL), 'UFV Noronha Verde', 'BD.Dados!D' + BD_REAL_TOTAL_ROW);
+    var ws = wb.Sheets['2 BD_DADOS'];
+    if(!ws) throw new Error('Aba "2 BD_DADOS" não encontrada no arquivo.');
+    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_NUM, BD_COL_LOCAL), 'Semana', '2 BD_DADOS!D8');
+    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_INICIO, BD_COL_LOCAL), 'Início', '2 BD_DADOS!D10');
+    plAssertLabel(plCellVal(ws, BD_ROW_SEMANA_FIM, BD_COL_LOCAL), 'Término', '2 BD_DADOS!D11');
+    plAssertLabel(plCellVal(ws, BD_PREV_TOTAL_ROW, BD_COL_LOCAL), 'UFV Noronha Verde', '2 BD_DADOS!D' + BD_PREV_TOTAL_ROW);
+    plAssertLabel(plCellVal(ws, BD_REAL_TOTAL_ROW, BD_COL_LOCAL), 'UFV Noronha Verde', '2 BD_DADOS!D' + BD_REAL_TOTAL_ROW);
     AREA_ORDER_PARSE.forEach(function(area, i){
-      plAssertLabel(plCellVal(ws, BD_PREV_ROWS[i], BD_COL_LOCAL), area, 'BD.Dados!D' + BD_PREV_ROWS[i] + ' (Previsto)');
-      plAssertLabel(plCellVal(ws, BD_REAL_ROWS[i], BD_COL_LOCAL), area, 'BD.Dados!D' + BD_REAL_ROWS[i] + ' (Real)');
+      plAssertLabel(plCellVal(ws, BD_PREV_ROWS[i], BD_COL_LOCAL), area, '2 BD_DADOS!D' + BD_PREV_ROWS[i] + ' (Previsto)');
+      plAssertLabel(plCellVal(ws, BD_REAL_ROWS[i], BD_COL_LOCAL), area, '2 BD_DADOS!D' + BD_REAL_ROWS[i] + ' (Real)');
     });
 
     var lastCol = BD_WEEK_COL_START - 1, emptyStreak = 0;
@@ -2780,7 +2780,7 @@ sb.auth.getSession().then(function(res){
       if(lbl == null || lbl === ''){ emptyStreak++; if(emptyStreak >= 2) break; }
       else { emptyStreak = 0; lastCol = c; }
     }
-    if(lastCol < BD_WEEK_COL_START) throw new Error('Nenhuma coluna de semana encontrada em BD.Dados.');
+    if(lastCol < BD_WEEK_COL_START) throw new Error('Nenhuma coluna de semana encontrada em 2 BD_DADOS.');
 
     var curva = [];
     var sumPrev = 0, sumReal = 0;
@@ -2802,28 +2802,28 @@ sb.auth.getSession().then(function(res){
     var sumRow32 = 0, sumRow45 = 0;
     for(var c2 = BD_WEEK_COL_START; c2 <= lastCol; c2++){ sumRow32 += plCellVal(ws, BD_PREV_TOTAL_ROW, c2) || 0; sumRow45 += plCellVal(ws, BD_REAL_TOTAL_ROW, c2) || 0; }
     if(Math.abs(sumRow32 - sumPrev) > 0.001 || Math.abs(sumRow45 - sumReal) > 0.001){
-      warnings.push('Soma das áreas diverge do total oficial da aba BD.Dados — confira antes de confirmar.');
+      warnings.push('Soma das áreas diverge do total oficial da aba 2 BD_DADOS — confira antes de confirmar.');
     }
 
     var cg17 = plNum(plCellVal(ws, BD_FATOR_ROW, BD_FATOR_CG_COL));
     var ck17 = plNum(plCellVal(ws, BD_FATOR_ROW, BD_FATOR_CK_COL));
     var fator = (cg17 && cg17 !== 0 && ck17 != null) ? (ck17 / cg17) : null;
     if(fator == null){
-      warnings.push('Fator de correção (BD.Dados!CK17/CG17) não encontrado ou inválido — Top Negativos/Positivos serão calculados sem correção (fator = 1,0000).');
+      warnings.push('Fator de correção (2 BD_DADOS!CK17/CG17) não encontrado ou inválido — Top Negativos/Positivos serão calculados sem correção (fator = 1,0000).');
     }
 
     return { curva: curva, fator: fator };
   }
 
   function plParseAtividades(wb, warnings){
-    var ws = wb.Sheets['PPD - Real - Quant.'];
-    if(!ws) throw new Error('Aba "PPD - Real - Quant." não encontrada no arquivo.');
-    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.local), 'LOCAL', 'PPD - Real - Quant.!A' + QT_HEADER_ROW);
-    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.nome), 'Nome da Tarefa', 'PPD - Real - Quant.!D' + QT_HEADER_ROW);
-    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.status), 'Status', 'PPD - Real - Quant.!L' + QT_HEADER_ROW);
-    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.peso), '% Peso Unitário', 'PPD - Real - Quant.!S' + QT_HEADER_ROW);
-    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.avPrev), '% Avanço Previsto', 'PPD - Real - Quant.!U' + QT_HEADER_ROW);
-    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.avReal), '% Avanço Real', 'PPD - Real - Quant.!V' + QT_HEADER_ROW);
+    var ws = wb.Sheets['4 PPD'];
+    if(!ws) throw new Error('Aba "4 PPD" não encontrada no arquivo.');
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.local), 'LOCAL', '4 PPD!A' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.nome), 'Nome da Tarefa', '4 PPD!D' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.status), 'Status', '4 PPD!L' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.peso), '% Peso Unitário', '4 PPD!S' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.avPrev), '% Avanço Previsto', '4 PPD!U' + QT_HEADER_ROW);
+    plAssertLabel(plCellVal(ws, QT_HEADER_ROW, QT_COL.avReal), '% Avanço Real', '4 PPD!V' + QT_HEADER_ROW);
 
     var range = XLSX.utils.decode_range(ws['!ref']);
     var maxRow = range.e.r + 1;
@@ -2865,7 +2865,7 @@ sb.auth.getSession().then(function(res){
     }
     if(pesoSum < 0.9 || pesoSum > 1.1) warnings.push('Soma de "% Peso Unitário" das tarefas = ' + (pesoSum*100).toFixed(1) + '% (esperado ~100%).');
     var corte = plExcelDateToISO(plCellVal(ws, 8, 6));
-    if(!corte) throw new Error('Data de corte (PPD - Real - Quant.!F8) não encontrada ou inválida.');
+    if(!corte) throw new Error('Data de corte (4 PPD!F8) não encontrada ou inválida.');
     return { atividades: atividades, dataCorte: corte };
   }
 
