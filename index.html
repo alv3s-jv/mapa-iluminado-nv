@@ -927,7 +927,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
         </div>
         <div class="pl-negpos-grid">
           <div class="pl-negpos-col">
-            <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-late)"></i>Top 10 Negativos</div>
+            <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-late)"></i>Top 3 Negativos</div>
             <table class="pl-table">
               <thead><tr>
                 <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-mae">Atividade Mãe</th><th class="pl-col-delta">Desvio</th>
@@ -936,7 +936,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             </table>
           </div>
           <div class="pl-negpos-col">
-            <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-ok)"></i>Top 10 Positivos</div>
+            <div class="pl-negpos-col-head"><i class="pl-sw" style="background:var(--pl-ok)"></i>Top 3 Positivos</div>
             <table class="pl-table">
               <thead><tr>
                 <th class="pl-col-rank">#</th><th>Atividade</th><th class="pl-col-mae">Atividade Mãe</th><th class="pl-col-delta">Desvio</th>
@@ -945,7 +945,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
             </table>
           </div>
         </div>
-        <div class="pl-table-foot"><span>Desvio = peso unitário × (avanço real − avanço previsto) × fator de correção (<span id="pl-fator-val">–</span>), mesma lógica da aba "Curva - S" da planilha PPD (AD28: Top Positivos/Negativos).</span></div>
+        <div class="pl-table-foot"><span>Desvio = peso unitário × (avanço real − avanço previsto) × fator de correção (<span id="pl-fator-val">–</span>). Atividades com o mesmo nome + atividade mãe são somadas num único ponto, para não repetir a mesma atividade em mais de um local.</span></div>
       </div>
 
     </div>
@@ -2393,21 +2393,30 @@ sb.auth.getSession().then(function(res){
     });
   }
 
-  /* Top Negativos/Positivos — mesma lógica da aba "Curva - S" (AD28) da planilha:
-     %Delta Avanço por atividade (Tabela7, nível folha) = peso_unitario × (avanço real
-     − avanço previsto); esse valor bruto é então multiplicado pelo fator de correção
-     do replanejamento (2 BD_DADOS!CK17/CG17) e ranqueado — LARGE/SMALL dos 10 maiores
-     e 10 menores, sem filtrar por sinal (igual à planilha). */
+  /* Top Negativos/Positivos — base na mesma fórmula da aba "Curva - S" (AD28) da
+     planilha: %Delta Avanço por atividade (Tabela7, nível folha) = peso_unitario ×
+     (avanço real − avanço previsto), multiplicado pelo fator de correção do
+     replanejamento (2 BD_DADOS!CK17/CG17). Diferente da planilha (que rankeia linha a
+     linha), aqui agrupamos por nome da atividade + atividade mãe antes de ranquear —
+     a mesma atividade executada em mais de um local (ex.: "Adaptação da
+     terraplenagem/drenagem" em SE NV e em SE FN) vira um único ponto com o desvio
+     somado, em vez de aparecer repetida na lista. Top 3 maiores e 3 menores. */
   function computeTopDeltas(atividades, fator, area){
     var f = (typeof fator === 'number' && isFinite(fator) && fator !== 0) ? fator : 1;
-    var rows = atividades
+    var byKey = {}, order = [];
+    atividades
       .filter(function(t){ return t.peso_unitario != null && t.avanco_previsto != null && t.avanco_real != null && (!area || t.local === area); })
-      .map(function(t){
+      .forEach(function(t){
         var deltaRaw = (Number(t.peso_unitario)||0) * ((Number(t.avanco_real)||0) - (Number(t.avanco_previsto)||0));
-        return { nome: t.nome_tarefa, mae: t.atividade_mae || '—', peso: (Number(t.peso_unitario)||0) * 100, delta: deltaRaw * f * 100 };
+        var mae = t.atividade_mae || '—';
+        var key = t.nome_tarefa + '|' + mae;
+        if(!byKey[key]){ byKey[key] = { nome: t.nome_tarefa, mae: mae, peso: 0, delta: 0 }; order.push(key); }
+        byKey[key].peso += (Number(t.peso_unitario)||0) * 100;
+        byKey[key].delta += deltaRaw * f * 100;
       });
+    var rows = order.map(function(k){ return byKey[k]; });
     var sorted = rows.slice().sort(function(a,b){ return a.delta - b.delta; });
-    return { negativos: sorted.slice(0, 10), positivos: sorted.slice(-10).reverse(), fator: f };
+    return { negativos: sorted.slice(0, 3), positivos: sorted.slice(-3).reverse(), fator: f };
   }
 
   function computeDerived(snapData, corte, area){
