@@ -921,7 +921,7 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
         <div class="pl-area-grid" id="pl-area-grid"></div>
       </div>
 
-      <div class="pl-negpos-block">
+      <div class="pl-negpos-block" id="pl-negpos-block">
         <div class="pl-negpos-head">
           <span class="eyebrow">Top atividades por impacto <span class="pl-subnote" id="pl-negpos-summary">Δ Avanço × peso, corrigido pelo fator de replanejamento</span></span>
         </div>
@@ -2258,6 +2258,25 @@ sb.auth.getSession().then(function(res){
   }
   window.__mapaSb.auth.onAuthStateChange(function(){ plUpdateAdminVisibility(); });
   plUpdateAdminVisibility();
+
+  /* ---------- 2c. bloco "Top Negativos/Positivos" oculto pra contas de cliente ----------
+     Conta de cliente (visualizador externo) não deve ver o ranking de desvios por
+     atividade — só o e-mail listado em PL_RESTRICTED_EMAILS. Mesma lógica de
+     reavaliação a cada troca de sessão usada em plUpdateAdminVisibility(). */
+  var PL_RESTRICTED_EMAILS = ['neoenergia@noronhaverde.com'];
+  var plNegPosBlock = document.getElementById('pl-negpos-block');
+  async function plNegPosVisibility(){
+    if(!plNegPosBlock) return;
+    var email = null;
+    try{
+      var res = await window.__mapaSb.auth.getSession();
+      var session = res.data && res.data.session;
+      email = session && session.user && session.user.email;
+    }catch(e){ email = null; }
+    plNegPosBlock.style.display = (email && PL_RESTRICTED_EMAILS.indexOf(email) !== -1) ? 'none' : '';
+  }
+  window.__mapaSb.auth.onAuthStateChange(function(){ plNegPosVisibility(); });
+  plNegPosVisibility();
 
   var AREA_META = {
     'SE NV': {sub:'Subestação Noronha Verde', grupo:'Subestações'},
