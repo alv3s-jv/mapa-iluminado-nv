@@ -641,7 +641,8 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
   .sidebar:not(.expanded) .highlight-grid,
   .sidebar:not(.expanded) section.panel h2{display:none}
   .sidebar:not(.expanded) #bess-panel,
-  .sidebar:not(.expanded) #senv-panel{display:none}
+  .sidebar:not(.expanded) #senv-panel,
+  .sidebar:not(.expanded) #sefn-panel{display:none}
   .sidebar:not(.expanded) .nv-grid{display:flex;gap:8px;overflow-x:auto;flex-direction:row!important}
   .sidebar:not(.expanded) .nv-card{flex:none;width:96px;padding:8px 10px;grid-template-columns:1fr;text-align:left}
   .sidebar:not(.expanded) .nv-card .nv-bars,.sidebar:not(.expanded) .nv-card .nv-status{display:none}
@@ -779,6 +780,10 @@ section.panel h2 .h2-note{font-family:var(--font-body);font-size:12px;letter-spa
           <section class="panel" id="senv-panel">
             <h2>Fundações — SE Noronha Verde <span class="h2-note">por tipo de estrutura</span></h2>
             <div class="nv-grid" id="senv-grid"></div>
+          </section>
+          <section class="panel" id="sefn-panel">
+            <h2>Fundações — SE Fernando de Noronha <span class="h2-note">por tipo de estrutura</span></h2>
+            <div class="nv-grid" id="sefn-grid"></div>
           </section>
           <div class="legend-note"><b>Metodologia.</b> Avanço de estacas, mesas e módulos por contagem de unidades; consolidado por NV como média simples dos três percentuais. Toque no NV para centralizar no mapa.</div>
         </div>
@@ -1103,11 +1108,11 @@ if(logoutBtn){
   if(!openBtn) return;
 
   var NVs = ['01','02','03','04','05','06'];
-  var LAYER_LABELS = {estacas:'Estacas', mesas:'Mesas', modulos:'Módulos', supressao:'Supressão vegetal', terraplenagem:'Terraplenagem'};
+  var LAYER_LABELS = {estacas:'Estacas', mesas:'Mesas', modulos:'Módulos', supressao:'Supressão vegetal', terraplenagem:'Terraplenagem', fundacoes:'Fundações (BESS + SE NV + SE FN)'};
 
   // manifest[layer] = {'01': entry, ...} for estacas/mesas/modulos; manifest[layer] = entry for supressao/terraplenagem
   // entry = {fileName, db, candidates:[{table,count,minx,miny,maxx,maxy}], chosenTable, srsId}
-  var manifest = {estacas:{}, mesas:{}, modulos:{}, supressao:null, terraplenagem:null};
+  var manifest = {estacas:{}, mesas:{}, modulos:{}, supressao:null, terraplenagem:null, fundacoes:null};
   var unresolved = []; // files that couldn't be auto-classified, need manual pick
   var sqlJsReady = null;
 
@@ -1167,7 +1172,8 @@ if(logoutBtn){
     if(/m[oó]dulos?/.test(n) && nv) return {layer:'modulos', nv: nv};
     if(/supress/.test(n)) return {layer:'supressao', nv: null};
     if(/terraplenagem/.test(n)) return {layer:'terraplenagem', nv: null};
-    if(/aterramento|funda[cç][aã]o|funda[cç][oõ]es|kmz|\.qgz$/.test(n)) return {layer:'out_of_scope', nv: null};
+    if(/funda[cç][aã]o|funda[cç][oõ]es/.test(n)) return {layer:'fundacoes', nv: null};
+    if(/aterramento|kmz|\.qgz$/.test(n)) return {layer:'out_of_scope', nv: null};
     return null;
   }
 
@@ -1318,6 +1324,9 @@ if(logoutBtn){
     ['supressao','terraplenagem'].forEach(function(layer){
       rows.push({layer: layer, nv: null, entry: manifest[layer]});
     });
+    if(manifest.fundacoes){
+      rows.push({layer: 'fundacoes', nv: null, entry: manifest.fundacoes});
+    }
 
     var html = '<table class="manifest-table"><thead><tr><th>Camada</th><th>Arquivo</th><th>Tabela</th><th></th></tr></thead><tbody>';
     rows.forEach(function(r){
@@ -1372,6 +1381,7 @@ if(logoutBtn){
     }
     if(!manifest.supressao || !manifest.supressao.chosenTable) return false;
     if(!manifest.terraplenagem || !manifest.terraplenagem.chosenTable) return false;
+    if(manifest.fundacoes && !manifest.fundacoes.chosenTable) return false; // opcional; se enviada, precisa resolver a tabela
     return true;
   }
 
@@ -1400,13 +1410,15 @@ if(logoutBtn){
     });
     var totSup = manifest.supressao.candidates.filter(function(c){return c.table===manifest.supressao.chosenTable;})[0].count;
     var totTerra = manifest.terraplenagem.candidates.filter(function(c){return c.table===manifest.terraplenagem.chosenTable;})[0].count;
+    var totFund = manifest.fundacoes ? manifest.fundacoes.candidates.filter(function(c){return c.table===manifest.fundacoes.chosenTable;})[0].count : null;
     summaryEl.textContent = 'Todos os arquivos necessários foram identificados.';
     preview.innerHTML =
       '<b>Estacas:</b> ' + totE.toLocaleString('pt-BR') + ' registros<br>' +
       '<b>Mesas:</b> ' + totM.toLocaleString('pt-BR') + ' registros<br>' +
       '<b>Módulos:</b> ' + totMo.toLocaleString('pt-BR') + ' registros<br>' +
       '<b>Supressão vegetal:</b> ' + totSup.toLocaleString('pt-BR') + ' polígonos<br>' +
-      '<b>Terraplenagem:</b> ' + totTerra.toLocaleString('pt-BR') + ' polígonos';
+      '<b>Terraplenagem:</b> ' + totTerra.toLocaleString('pt-BR') + ' polígonos' +
+      (totFund != null ? '<br><b>Fundações (BESS/SE NV/SE FN):</b> ' + totFund.toLocaleString('pt-BR') + ' polígonos' : '');
     preview.hidden = false;
     submitBtn.disabled = false;
   }
@@ -1533,6 +1545,40 @@ if(logoutBtn){
   var terraplenagemCategoria = function(r){ return r['TERRAPLENAGEM'] === 1 ? 'CONCLUIDO' : 'PENDENTE'; };
   terraplenagemCategoria.cols = ['TERRAPLENAGEM'];
 
+  /* ---------- fundações (BESS + SE Noronha Verde + SE Fernando de Noronha) ----------
+     Camada opcional nesta esteira: antes era atualizada manualmente à parte. As 6 colunas
+     de etapa abaixo batem 1:1 com o checklist já usado no mapa (ver STAGES em
+     buildFundacoesBess). Nome de tabela/colunas de destino no Supabase ainda não
+     confirmado no schema real — ver replaceTable('fundacoes_bess', ...) mais abaixo. */
+  var FUNDACOES_STAGE_COLS = [['ESCAVACAO','escavacao'],['MAGRO','magro'],['ARMACAO','armacao'],['CONCRETAGEM ESTRUTURAL','concretagem_estrutural'],['ACABAMENTO','acabamento'],['FINALIZADO','finalizado']];
+  function normalizeFundacoesLocal(raw){
+    var s = String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');
+    var half = s.length/2;
+    if(s.length % 2 === 0 && s.slice(0, half) === s.slice(half)) s = s.slice(0, half); // corrige duplicação tipo "SE NORONHA VERDESE NORONHA VERDE"
+    if(s.indexOf('FERNANDO') !== -1) return 'SE FERNANDO DE NORONHA';
+    if(s.indexOf('NORONHA VERDE') !== -1) return 'SE NORONHA VERDE';
+    if(s.indexOf('BESS') !== -1) return 'BESS';
+    return s;
+  }
+  function readFundacoesRows(entry){
+    var db = entry.db, table = entry.chosenTable;
+    var srsId = entry.candidates.filter(function(c){return c.table===table;})[0].srsId;
+    var cols = tableColumns(db, table);
+    requireColumn(cols, 'Name');
+    requireColumn(cols, 'LOCAL');
+    requireColumn(cols, 'geom');
+    FUNDACOES_STAGE_COLS.forEach(function(sc){ requireColumn(cols, sc[0]); });
+    var selectCols = FUNDACOES_STAGE_COLS.map(function(sc){ return '"' + sc[0] + '"'; }).join(', ');
+    var recs = queryAll(db, 'SELECT "Name", "LOCAL", ' + selectCols + ', geom FROM \'' + table + '\'');
+    return recs.map(function(r){
+      var ring = readMultiPolygonFirstRing2D(gpkgWkbPayload(r.geom));
+      var ring2d = ring.map(function(p){ return toWgs84(p[0], p[1], srsId); });
+      var row = { name: r.Name || '', local: normalizeFundacoesLocal(r.LOCAL), geom: wktPolygon(ring2d) };
+      FUNDACOES_STAGE_COLS.forEach(function(sc){ row[sc[1]] = !!r[sc[0]]; });
+      return row;
+    });
+  }
+
   submitBtn.addEventListener('click', function(){
     if(!manifestComplete()) return;
     submitBtn.disabled = true;
@@ -1590,6 +1636,24 @@ if(logoutBtn){
         var metaRes = await sb.from('project_meta').update({value: dataBR}).eq('key', 'updated_at');
         if(metaRes.error) throw new Error('data de atualização: ' + metaRes.error.message);
         log('Data de atualização definida para ' + dataBR + '.', 'ok');
+
+        if(manifest.fundacoes && manifest.fundacoes.chosenTable){
+          /* Roda por último e isolada de propósito: nome de tabela/colunas ainda não
+             confirmado no schema real do Supabase (RPC get_fundacoes_bess_features só
+             expõe o formato de leitura, não o da tabela). Se falhar aqui, as camadas
+             de cima (estacas/mesas/módulos/supressão/terraplenagem + data de atualização)
+             já foram gravadas normalmente — só fundações fica pendente. */
+          try{
+            var fundacoesRows = readFundacoesRows(manifest.fundacoes);
+            log('Fundações (BESS/SE NV/SE FN): ' + fundacoesRows.length + ' polígonos');
+            await replaceTable('fundacoes_bess', fundacoesRows);
+            log('Fundações enviadas.', 'ok');
+          }catch(fundErr){
+            console.error(fundErr);
+            log('ERRO (fundações): ' + fundErr.message, 'err');
+            log('As demais camadas foram enviadas normalmente — só fundações falhou. Avise o Claude para ajustar nome de tabela/colunas.', 'err');
+          }
+        }
 
         log('Concluído. Recarregando o mapa…', 'ok');
         setTimeout(function(){ window.location.reload(); }, 1200);
@@ -1914,6 +1978,7 @@ async function boot(){
     }
     buildCard('bess-grid', 'BESS', 'BESS');
     buildCard('senv-grid', 'SE NORONHA VERDE', 'SE Noronha Verde');
+    buildCard('sefn-grid', 'SE FERNANDO DE NORONHA', 'SE Fernando de Noronha');
   }
   async function buildAterramento(){
     var [linhasRes, pontosRes] = await Promise.all([
