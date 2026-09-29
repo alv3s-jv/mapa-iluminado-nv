@@ -2324,7 +2324,12 @@ sb.auth.getSession().then(function(res){
     if(!snap) return { snap: null };
     var [curvaRes, ativRes] = await Promise.all([
       plSchema().from('ppd_curva_area').select('*').eq('snapshot_id', snap.id),
-      plSchema().from('ppd_atividades').select('*').eq('snapshot_id', snap.id)
+      /* RPC em vez de select direto na tabela crua: get_ppd_atividades() filtra
+         no próprio banco (SECURITY DEFINER) os e-mails listados em
+         planejamento.restricted_viewers, retornando 0 linhas pra essas contas —
+         a conta de cliente nunca recebe os dados granulares por atividade,
+         não é só a UI escondendo (ver plNegPosVisibility()). */
+      plSchema().rpc('get_ppd_atividades', { p_snapshot_id: snap.id })
     ]);
     if(curvaRes.error || ativRes.error){ console.error('[planejamento] erro ao buscar dados', curvaRes.error, ativRes.error); return { error: curvaRes.error || ativRes.error }; }
     return { snap: snap, curva: curvaRes.data || [], atividades: ativRes.data || [] };
